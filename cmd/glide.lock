@@ -1,0 +1,12 @@
+hash: fce75cabcf35429120c0f7bfed3843967197be00173b26ec062d35efe1facb68
+updated: 2019-03-18T15:30:58.231630347+08:00
+imports:
+- name: github.com/gorilla/context
+  version: 51ce91d2eaddeca0ef29a71d766bb3634dadf729
+- name: github.com/gorilla/mux
+  version: c5c6c98bc25355028a63748a498942a6398ccd22
+- name: github.com/howeyc/crc16
+  version: 2b2a61e366a66d3efb279e46176e7291001e0354
+- name: github.com/tarm/goserial
+  version: b3440c3c63556c3fd67e915be3b92195bc70294a
+testImports: []
