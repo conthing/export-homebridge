@@ -107,7 +107,7 @@ func Decode(jsonStr []byte) {
 	configdata := createConfigData(Accessaries)
 	b, _ := json.MarshalIndent(configdata, "", " ") //变成json字符串
 
-	err = ioutil.WriteFile("/root/config.json", b, os.ModeAppend) //create config.json
+	err = ioutil.WriteFile("/root/.homebridge/config.json", b, os.ModeAppend) //create config.json
 	if err != nil {
 		fmt.Println(err)
 	}
