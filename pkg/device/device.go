@@ -48,7 +48,7 @@ type Accessary struct {
 type Envelope []struct {
 	Name    string
 	ID      string
-	Service interface{}
+	Labels  []string
 	Profile Profile
 }
 
@@ -90,12 +90,12 @@ func Decode(jsonStr []byte) {
 		accessary.Name = item.Name
 		accessary.ProxyID = item.ID
 		accessary.Accessory = "Control4"
-		accessary.Service = item.Service.(map[string]interface{})["name"].(string)
+		accessary.Service = item.Labels[0]
 		Accessaries = append(Accessaries, accessary)
 
 		accessarysender.Name = item.Name
 		accessarysender.ID = item.ID
-		accessarysender.Service = item.Service.(map[string]interface{})["name"].(string)
+		accessarysender.Service = item.Labels[0]
 		command := accessarysender.Commands
 		for i := 0; i < len(item.Profile.Commands); i++ {
 			command = append(command, item.Profile.Commands[i])
