@@ -88,7 +88,7 @@ func ZmqInit() {
 
 			}
 		} else {
-			params := commandzmq.Command.Params.(string)
+			params := commandzmq.Command.Params
 			proxyid := commandzmq.ProxyID
 			fmt.Println(params)
 			sendcommand(proxyid, params)

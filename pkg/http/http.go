@@ -17,14 +17,12 @@ func HttpPost() {
 	var addressable map[string]interface{}
 	registration = make(map[string]interface{})
 	addressable = make(map[string]interface{})
-	addressable["origin"] = 1471806386919
 	addressable["name"] = "EdgeXTestRESTXML"
 	addressable["protocol"] = "HTTP"
 	addressable["method"] = "POST"
 	addressable["address"] = "localhost"
 	addressable["port"] = 8111
 	addressable["path"] = "/rest"
-	registration["origin"] = 1471806386919
 	registration["name"] = "RESTXMLClient"
 	registration["format"] = "JSON"
 	registration["enable"] = true
