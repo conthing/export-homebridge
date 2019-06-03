@@ -92,7 +92,6 @@ func Decode(jsonStr []byte) {
 		accessary.ProxyID = item.ID
 		accessary.Accessory = "Control4"
 		accessary.Service = typeChoose(item.Labels[0])
-		accessary.Service = item.Labels[0]
 		Accessaries = append(Accessaries, accessary)
 
 		accessarysender.Name = item.Name

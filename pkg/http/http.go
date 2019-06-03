@@ -78,7 +78,8 @@ func GetMessage(msg string) string {
 func Put(commandstring string, params string) {
 
 	payload := strings.NewReader(params)
-
+	fmt.Println("command", commandstring)
+	fmt.Println("command", params)
 	req, _ := http.NewRequest("PUT", commandstring, payload)
 
 	req.Header.Add("Content-Type", "application/json")

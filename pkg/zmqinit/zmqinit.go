@@ -16,7 +16,7 @@ import (
 type CommandZmq struct {
 	Name    string `json:"name"`
 	Service string `json:"service"`
-	ProxyID string `json:"proxy_id"`
+	ID string `json:"id"`
 	Command struct {
 		Name   string `json:"name"`
 		Params interface{}
@@ -132,23 +132,50 @@ func ZmqInit() {
 
 }
 
+func getEdgexParams(commandzmq CommandZmq) string{
+	params := commandzmq.Command.Params
+	var edgexParams string
+	data :=make(map[string]string)
+if params.(map[string]interface{})["onOrOff"] != nil{
+onoroff := params.(map[string]interface{})["onOrOff"].(bool)
+if onoroff {
+data["Brightness"] = "100"
+}else{
+	data["Brightness"] = "0"
+}
+}else if params.(map[string]interface{})["Percent"] != nil{
+	fmt.Println("curtain")
+}else{
+fmt.Println("other type")
+}
+datajson,_ :=json.Marshal(data)
+edgexParams =string(datajson)
+return edgexParams
+}
+
 func sendcommand(proxyid string, params string) {
+	fmt.Println("in sendCommand")
+	fmt.Println(device.Accessarysenders)
 	for j := range device.Accessarysenders {
 		deviceid := device.Accessarysenders[j].ID
+		fmt.Println("proxyid = ",proxyid,"    deviceid = ",deviceid)
 		if deviceid == proxyid {
 			for k := range device.Accessarysenders[j].Commands {
 				switch device.Accessarysenders[j].Commands[k].Name {
 				case "Light":
+					fmt.Println("in Light")
 					commandid := device.Accessarysenders[j].Commands[k].ID
 					controlcommand := commandform(commandid, deviceid)
 					httpsender.Put(controlcommand, params)
 				case "Brightness":
+					fmt.Println("in Brightness")
 					commandid := device.Accessarysenders[j].Commands[k].ID
 					controlcommand := commandform(commandid, deviceid)
 					httpsender.Put(controlcommand, params)
 				case "Percent":
 
 				default:
+					fmt.Println("in default")
 				}
 
 			}
@@ -230,7 +257,7 @@ func LoadRestRoutes() http.Handler {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/rest", commandHandler).Methods(http.MethodGet, http.MethodPost)
-	r.HandleFunc("/homebridge/qrcode", qrcodeHandler).Methods(http.MethodGet)
+	r.HandleFunc("/api/v1/homebridge/qrcode", qrcodeHandler).Methods(http.MethodGet)
 
 	return r
 }
