@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/conthing/export-homebridge/pkg/device"
 	httpsender "github.com/conthing/export-homebridge/pkg/http"
@@ -66,32 +67,32 @@ func ZmqInit() {
 				//var name = device.Accessarysenders[i].Name
 				var deviceid = device.Accessarysenders[i].ID
 				for n := range device.Accessarysenders[i].Commands {
-					switch device.Accessarysenders[i].Commands[n].Name {
-					case "Light":
-						var commandid = device.Accessarysenders[i].Commands[n].ID
-						statuscommand := commandform(commandid, deviceid)
-						result := httpsender.GetMessage(statuscommand)
-						fmt.Println("123", result)
-						EventHanler(result)
-					case "Brightness":
+				//	switch device.Accessarysenders[i].Commands[n].Name {
+					// case "Light":
+					// 	var commandid = device.Accessarysenders[i].Commands[n].ID
+					// 	statuscommand := commandform(commandid, deviceid)
+					// 	result := httpsender.GetMessage(statuscommand)
+					// 	fmt.Println("123", result)
+					// 	EventHanler(result)
+			//		case "brightness":
 						var commandid = device.Accessarysenders[i].Commands[n].ID
 						statuscommand := commandform(commandid, deviceid)
 						result := httpsender.GetMessage(statuscommand)
 						fmt.Println(result)
 						EventHanler(result)
-					case "Percent":
+		//			case "percent":
 
-					default:
-					}
+		//			default:
+		//			}
 
 				}
 
 			}
 		} else {
-			params := commandzmq.Command.Params
-			proxyid := commandzmq.ProxyID
+			params := getEdgexParams(commandzmq)
+			id := commandzmq.ID
 			fmt.Println(params)
-			sendcommand(proxyid, params)
+			sendcommand(id, params)
 			//			switch commandzmq.Service {
 			//			case "LightBulb":
 			//				sendcommand(proxyid, params)
@@ -139,11 +140,13 @@ func getEdgexParams(commandzmq CommandZmq) string{
 if params.(map[string]interface{})["onOrOff"] != nil{
 onoroff := params.(map[string]interface{})["onOrOff"].(bool)
 if onoroff {
-data["Brightness"] = "100"
+data["brightness"] = "100"
 }else{
-	data["Brightness"] = "0"
+	data["brightness"] = "0"
 }
-}else if params.(map[string]interface{})["Percent"] != nil{
+}else if params.(map[string]interface{})["percent"] != nil{
+	 percent := params.(map[string]interface{})["percent"].(float64)
+	 data["percent"] = strconv.FormatInt(int64(percent), 10)
 	fmt.Println("curtain")
 }else{
 fmt.Println("other type")
@@ -161,22 +164,28 @@ func sendcommand(proxyid string, params string) {
 		fmt.Println("proxyid = ",proxyid,"    deviceid = ",deviceid)
 		if deviceid == proxyid {
 			for k := range device.Accessarysenders[j].Commands {
-				switch device.Accessarysenders[j].Commands[k].Name {
-				case "Light":
-					fmt.Println("in Light")
-					commandid := device.Accessarysenders[j].Commands[k].ID
-					controlcommand := commandform(commandid, deviceid)
-					httpsender.Put(controlcommand, params)
-				case "Brightness":
-					fmt.Println("in Brightness")
-					commandid := device.Accessarysenders[j].Commands[k].ID
-					controlcommand := commandform(commandid, deviceid)
-					httpsender.Put(controlcommand, params)
-				case "Percent":
-
-				default:
-					fmt.Println("in default")
-				}
+				commandid := device.Accessarysenders[j].Commands[k].ID
+				controlcommand := commandform(commandid, deviceid)
+				httpsender.Put(controlcommand, params)
+				// switch device.Accessarysenders[j].Commands[k].Name {
+				// case "Light":
+				// 	fmt.Println("in Light")
+				// 	commandid := device.Accessarysenders[j].Commands[k].ID
+				// 	controlcommand := commandform(commandid, deviceid)
+				// 	httpsender.Put(controlcommand, params)
+				// case "brightness":
+				// 	fmt.Println("in Brightness")
+				// 	commandid := device.Accessarysenders[j].Commands[k].ID
+				// 	controlcommand := commandform(commandid, deviceid)
+				// 	httpsender.Put(controlcommand, params)
+				// case "Percent":
+				// 	fmt.Println("in Brightness")
+				// 	commandid := device.Accessarysenders[j].Commands[k].ID
+				// 	controlcommand := commandform(commandid, deviceid)
+				// 	httpsender.Put(controlcommand, params)
+				// default:
+				// 	fmt.Println("in default")
+				// }
 
 			}
 		}
@@ -243,6 +252,7 @@ func EventHanler(bd string) {
 
 		status["status"] = statuses
 	}
+
 	data, _ := json.MarshalIndent(status, "", " ")
 	if Statusport != "" {
 		statusReq.Connect(Statusport)
