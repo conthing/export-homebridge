@@ -38,6 +38,7 @@ func HttpPost() {
 		bytes.NewBuffer(jsonstr))
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 
 	defer resp.Body.Close()
@@ -45,6 +46,7 @@ func HttpPost() {
 	if err != nil {
 		// handle error
 		fmt.Println(err)
+		return
 	}
 
 	fmt.Println(string(body))
@@ -59,6 +61,7 @@ func GetMessage(msg string) string {
 	resp, err := http.Get(msg)
 	if err != nil {
 		fmt.Println(err)
+		return ""
 	}
 
 	defer resp.Body.Close()
@@ -66,6 +69,7 @@ func GetMessage(msg string) string {
 	if err != nil {
 		// handle error
 		fmt.Println(err)
+		return ""
 	}
 
 	result := string(body)
@@ -89,6 +93,7 @@ func Put(commandstring string, params string) {
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 
 	defer res.Body.Close()

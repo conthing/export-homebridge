@@ -41,6 +41,7 @@ var QRcode string
 func ZmqInit() {
 	context, _ := zmq.NewContext()
 	commandRep, _ := context.NewSocket(zmq.REP)
+	defer commandRep.Close()
 	commandRep.Bind("tcp://127.0.0.1:9998")
 	var commandzmq CommandZmq
 
@@ -50,13 +51,15 @@ func ZmqInit() {
 		msgbyte := []byte(msg)
 		err := json.Unmarshal([]byte(msgbyte), &commandzmq)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			return
 		}
-		println("Got", string(msg))
+		fmt.Println("Got", string(msg))
 		commandRep.Send(msg, 0)
 
 		if commandzmq.Command.Name == "init" {
 			Statusport = commandzmq.Command.Params.(map[string]interface{})["statusport"].(string)
+			fmt.Println("Statusport", Statusport)
 			QRcode = commandzmq.Command.Params.(map[string]interface{})["QRcode"].(string)
 
 			fmt.Println(QRcode)
@@ -129,7 +132,7 @@ func ZmqInit() {
 
 		//发送具体的命令
 
-	}
+	}  
 
 }
 
@@ -216,6 +219,7 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 func EventHanler(bd string) {
 	context1, _ := zmq.NewContext()
 	statusReq, _ := context1.NewSocket(zmq.REQ)
+	defer statusReq.Close()
 	var event Event
 	var status map[string]interface{}
 	var statuses []map[string]interface{}
@@ -223,7 +227,8 @@ func EventHanler(bd string) {
 	bytestr := []byte(bd)
 	err := json.Unmarshal([]byte(bytestr), &event)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 	devicename := event.Device
 	for i := range device.Accessaries {
@@ -254,6 +259,7 @@ func EventHanler(bd string) {
 	}
 
 	data, _ := json.MarshalIndent(status, "", " ")
+	fmt.Println(Statusport)
 	if Statusport != "" {
 		statusReq.Connect(Statusport)
 		statusReq.Send(string(data), 0)
