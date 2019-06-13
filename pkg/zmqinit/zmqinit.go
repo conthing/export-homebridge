@@ -284,7 +284,7 @@ func LoadRestRoutes() http.Handler {
 
 func qrcodeHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
-	pincode := device.Pinbuffer.String()
+	pincode := device.Pincode
 	var data map[string]string = map[string]string{}
 	var datasend []map[string]string
 	data["pincode"] = pincode
