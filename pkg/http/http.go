@@ -7,28 +7,41 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"log"
 
 	"github.com/conthing/export-homebridge/pkg/device"
+	"github.com/edgexfoundry/go-mod-core-contracts/models"
 )
 
 func HttpPost() {
 
-	var registration map[string]interface{}
-	var addressable map[string]interface{}
-	registration = make(map[string]interface{})
-	addressable = make(map[string]interface{})
-	addressable["name"] = "EdgeXTestRESTXML"
-	addressable["protocol"] = "HTTP"
-	addressable["method"] = "POST"
-	addressable["address"] = "localhost"
-	addressable["port"] = 8111
-	addressable["path"] = "/rest"
-	registration["name"] = "RESTXMLClient"
-	registration["format"] = "JSON"
-	registration["enable"] = true
-	registration["destination"] = "REST_ENDPOINT"
-	registration["addressable"] = addressable
-	data, _ := json.MarshalIndent(registration, "", " ")
+	reg := models.Registration{}
+	reg.Name = "RESTXMLClient"
+	reg.Format = "JSON"
+	reg.Filter.ValueDescriptorIDs = []string{"brightness","percent","moving"}
+	reg.Enable = true
+	reg.Destination = "REST_ENDPOINT"
+	reg.Addressable = models.Addressable{Name:"EdgeXTestRESTXML" , Protocol:"HTTP" , HTTPMethod:"POST" ,
+	Address:"localhost" , Port:8111 , Path:"/rest"}
+	
+
+	// var registration map[string]interface{}
+	// var addressable map[string]interface{}
+	// registration = make(map[string]interface{})
+	// addressable = make(map[string]interface{})
+	// addressable["name"] = "EdgeXTestRESTXML"
+	// addressable["protocol"] = "HTTP"
+	// addressable["method"] = "POST"
+	// addressable["address"] = "localhost"
+	// addressable["port"] = 8111
+	// addressable["path"] = "/rest"
+	// registration["name"] = "RESTXMLClient"
+	// registration["format"] = "JSON"
+	// registration["filter"] = filter
+	// registration["enable"] = true
+	// registration["destination"] = "REST_ENDPOINT"
+	// registration["addressable"] = addressable
+	data, _ := json.Marshal(reg)
 
 	//str := "{\"origin\":1471806386919,\"name\":\"RESTXMLClient\",\"addressable\":{\"origin\":1471806386919,\"name\":\"EdgeXTestRESTXML\",\"protocol\":\"HTTP\",\"method\": \"POST\",\"address\":\"localhost\",\"port\":8111,\"path\":\"/rest\"},\"format\":\"JSON\",\"enable\":true,\"destination\":\"REST_ENDPOINT\"}"
 
@@ -37,7 +50,7 @@ func HttpPost() {
 		"application/json",
 		bytes.NewBuffer(jsonstr))
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
@@ -45,22 +58,21 @@ func HttpPost() {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		// handle error
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
-	fmt.Println(string(body))
+	log.Println(string(body))
 
 	devicelisturl := "http://localhost:48081/api/v1/device"
 	var devicelist = GetMessage(devicelisturl)
 	device.Decode([]byte(devicelist))
-	fmt.Println(devicelist)
 }
 
 func GetMessage(msg string) string {
 	resp, err := http.Get(msg)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return ""
 	}
 
@@ -68,13 +80,13 @@ func GetMessage(msg string) string {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		// handle error
-		fmt.Println(err)
+		log.Println(err)
 		return ""
 	}
 
 	result := string(body)
 
-	fmt.Println(string(body))
+	log.Println(string(body))
 
 	return result
 }
@@ -82,8 +94,6 @@ func GetMessage(msg string) string {
 func Put(commandstring string, params string) {
 
 	payload := strings.NewReader(params)
-	fmt.Println("command", commandstring)
-	fmt.Println("command", params)
 	req, _ := http.NewRequest("PUT", commandstring, payload)
 
 	req.Header.Add("Content-Type", "application/json")
@@ -98,7 +108,5 @@ func Put(commandstring string, params string) {
 
 	defer res.Body.Close()
 	body, _ := ioutil.ReadAll(res.Body)
-
-	fmt.Println(res)
 	fmt.Println(string(body))
 }

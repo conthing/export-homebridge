@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/conthing/export-homebridge/pkg/device"
 	httpsender "github.com/conthing/export-homebridge/pkg/http"
@@ -35,14 +36,31 @@ type Reading struct {
 	Value string
 }
 
+type Status struct {
+	Id              string           `json:"id"`
+	Name            string           `json:"name"`
+	Service         string           `json:"service"`
+	Characteristic  StCharacteristic `json:"characteristic"`
+}
+
+type StCharacteristic struct {
+	Brightness     int         `json:"brightness"`
+	Percent        int		   `json:"percent"` 
+}
+
 var Statusport string
 var QRcode string
+var newPublisher *zmq.Socket
 
 func ZmqInit() {
 	context, _ := zmq.NewContext()
 	commandRep, _ := context.NewSocket(zmq.REP)
 	defer commandRep.Close()
-	commandRep.Bind("tcp://127.0.0.1:9998")
+
+	newPublisher, _ = zmq.NewSocket(zmq.PUB)
+
+	commandRep.Connect("tcp://127.0.0.1:9998")
+
 	var commandzmq CommandZmq
 
 	for {
@@ -56,13 +74,10 @@ func ZmqInit() {
 		}
 		fmt.Println("Got", string(msg))
 		commandRep.Send(msg, 0)
-
+		fmt.Println("send ok!")
 		if commandzmq.Command.Name == "init" {
 			Statusport = commandzmq.Command.Params.(map[string]interface{})["statusport"].(string)
-			fmt.Println("Statusport", Statusport)
 			QRcode = commandzmq.Command.Params.(map[string]interface{})["QRcode"].(string)
-
-			fmt.Println(QRcode)
 
 			//qrcode := commandzmq.Command.Params.QRcode
 			for i := range device.Accessarysenders {
@@ -81,7 +96,6 @@ func ZmqInit() {
 						var commandid = device.Accessarysenders[i].Commands[n].ID
 						statuscommand := commandform(commandid, deviceid)
 						result := httpsender.GetMessage(statuscommand)
-						fmt.Println(result)
 						EventHanler(result)
 		//			case "percent":
 
@@ -94,7 +108,6 @@ func ZmqInit() {
 		} else {
 			params := getEdgexParams(commandzmq)
 			id := commandzmq.ID
-			fmt.Println(params)
 			sendcommand(id, params)
 			//			switch commandzmq.Service {
 			//			case "LightBulb":
@@ -150,7 +163,6 @@ data["brightness"] = "100"
 }else if params.(map[string]interface{})["percent"] != nil{
 	 percent := params.(map[string]interface{})["percent"].(float64)
 	 data["percent"] = strconv.FormatInt(int64(percent), 10)
-	fmt.Println("curtain")
 }else{
 fmt.Println("other type")
 }
@@ -160,11 +172,8 @@ return edgexParams
 }
 
 func sendcommand(proxyid string, params string) {
-	fmt.Println("in sendCommand")
-	fmt.Println(device.Accessarysenders)
 	for j := range device.Accessarysenders {
 		deviceid := device.Accessarysenders[j].ID
-		fmt.Println("proxyid = ",proxyid,"    deviceid = ",deviceid)
 		if deviceid == proxyid {
 			for k := range device.Accessarysenders[j].Commands {
 				commandid := device.Accessarysenders[j].Commands[k].ID
@@ -217,12 +226,8 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func EventHanler(bd string) {
-	context1, _ := zmq.NewContext()
-	statusReq, _ := context1.NewSocket(zmq.REQ)
-	defer statusReq.Close()
 	var event Event
 	var status map[string]interface{}
-	var statuses []map[string]interface{}
 	status = make(map[string]interface{})
 	bytestr := []byte(bd)
 	err := json.Unmarshal([]byte(bytestr), &event)
@@ -235,37 +240,36 @@ func EventHanler(bd string) {
 		defaultname := device.Accessaries[i].Name
 		defaultid := device.Accessaries[i].ProxyID
 		defaulttype := device.Accessaries[i].Service
-		fmt.Println(defaultid, defaulttype, defaultname)
 		if defaultname == devicename {
-			var list map[string]interface{}
-			list = make(map[string]interface{})
-			list["id"] = defaultid
-			list["name"] = defaultname
-			list["service"] = defaulttype
-			//zu bao
-			var reading map[string]interface{}
-			reading = make(map[string]interface{})
+			var ststatus Status
 			for j := range event.Readings {
-				readingname := event.Readings[j].Name
-				readingvalue := event.Readings[j].Value
-				reading[readingname] = readingvalue
-
+				switch event.Readings[j].Name{
+				case "brightness":
+					ststatus.Characteristic.Brightness,_ = strconv.Atoi(event.Readings[j].Value)
+				case "percent":
+					ststatus.Characteristic.Percent,_ = strconv.Atoi(event.Readings[j].Value)
+				default:
+					return
+				}
 			}
-			list["characteristic"] = reading
-			statuses = append(statuses, list)
-		}
 
-		status["status"] = statuses
+			ststatus.Id = defaultid
+			ststatus.Name = defaultname
+			ststatus.Service = defaulttype
+			status["status"] = ststatus
+		}
 	}
 
 	data, _ := json.MarshalIndent(status, "", " ")
-	fmt.Println(Statusport)
 	if Statusport != "" {
-		statusReq.Connect(Statusport)
-		statusReq.Send(string(data), 0)
-		defer statusReq.Close()
+		log.Printf("zmq bind to %s", Statusport)
+		_ = newPublisher.Bind(Statusport)
+		time.Sleep(200 * time.Millisecond)
+		fmt.Println("send to js ", string(data))
+		_, _ = newPublisher.SendMessage("status", data)
 	}
-	fmt.Println(string(data))
+
+
 }
 
 //LoadRestRoutes 定义REST资源
