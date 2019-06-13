@@ -45,6 +45,7 @@ type Status struct {
 
 type StCharacteristic struct {
 	Brightness     int         `json:"brightness"`
+	On             bool        `json:"on"` 
 	Percent        int		   `json:"percent"` 
 }
 
@@ -246,6 +247,12 @@ func EventHanler(bd string) {
 				switch event.Readings[j].Name{
 				case "brightness":
 					ststatus.Characteristic.Brightness,_ = strconv.Atoi(event.Readings[j].Value)
+					if ststatus.Characteristic.Brightness > 0 {
+						ststatus.Characteristic.On = true
+					}else{
+						ststatus.Characteristic.On = false
+					}
+					
 				case "percent":
 					ststatus.Characteristic.Percent,_ = strconv.Atoi(event.Readings[j].Value)
 				default:
