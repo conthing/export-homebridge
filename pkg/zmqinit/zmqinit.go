@@ -36,16 +36,26 @@ type Reading struct {
 	Value string
 }
 
-type Status struct {
+type LightStatus struct {
 	Id              string           `json:"id"`
 	Name            string           `json:"name"`
 	Service         string           `json:"service"`
-	Characteristic  StCharacteristic `json:"characteristic"`
+	Characteristic  StLightCharacteristic `json:"characteristic"`
 }
 
-type StCharacteristic struct {
+type StLightCharacteristic struct {
 	Brightness     int         `json:"brightness"`
 	On             bool        `json:"on"` 
+}
+
+type CurtainStatus struct {
+	Id              string           `json:"id"`
+	Name            string           `json:"name"`
+	Service         string           `json:"service"`
+	Characteristic  StCurtainCharacteristic `json:"characteristic"`
+}
+
+type StCurtainCharacteristic struct {
 	Percent        int		   `json:"percent"` 
 }
 
@@ -75,7 +85,6 @@ func ZmqInit() {
 		}
 		fmt.Println("Got", string(msg))
 		commandRep.Send(msg, 0)
-		fmt.Println("send ok!")
 		if commandzmq.Command.Name == "init" {
 			Statusport = commandzmq.Command.Params.(map[string]interface{})["statusport"].(string)
 			QRcode = commandzmq.Command.Params.(map[string]interface{})["QRcode"].(string)
@@ -96,7 +105,9 @@ func ZmqInit() {
 			//		case "brightness":
 						var commandid = device.Accessarysenders[i].Commands[n].ID
 						statuscommand := commandform(commandid, deviceid)
+						fmt.Println("send",statuscommand)
 						result := httpsender.GetMessage(statuscommand)
+						fmt.Println("result",result)
 						EventHanler(result)
 		//			case "percent":
 
@@ -242,28 +253,34 @@ func EventHanler(bd string) {
 		defaultid := device.Accessaries[i].ProxyID
 		defaulttype := device.Accessaries[i].Service
 		if defaultname == devicename {
-			var ststatus Status
+			var lightstatus LightStatus
+			var curtainstatus CurtainStatus
 			for j := range event.Readings {
 				switch event.Readings[j].Name{
 				case "brightness":
-					ststatus.Characteristic.Brightness,_ = strconv.Atoi(event.Readings[j].Value)
-					if ststatus.Characteristic.Brightness > 0 {
-						ststatus.Characteristic.On = true
+					lightstatus.Characteristic.Brightness,_ = strconv.Atoi(event.Readings[j].Value)
+					if lightstatus.Characteristic.Brightness > 0 {
+						lightstatus.Characteristic.On = true
 					}else{
-						ststatus.Characteristic.On = false
+						lightstatus.Characteristic.On = false
 					}
-					
+					lightstatus.Id = defaultid
+					lightstatus.Name = defaultname
+					lightstatus.Service = defaulttype
+					status["status"] = lightstatus	
 				case "percent":
-					ststatus.Characteristic.Percent,_ = strconv.Atoi(event.Readings[j].Value)
+					curtainstatus.Characteristic.Percent,_ = strconv.Atoi(event.Readings[j].Value)
+					curtainstatus.Id = defaultid
+					curtainstatus.Name = defaultname
+					curtainstatus.Service = defaulttype
+					status["status"] = curtainstatus	
 				default:
 					return
 				}
 			}
 
-			ststatus.Id = defaultid
-			ststatus.Name = defaultname
-			ststatus.Service = defaulttype
-			status["status"] = ststatus
+
+		
 		}
 	}
 
