@@ -18,7 +18,7 @@ import (
 type CommandZmq struct {
 	Name    string `json:"name"`
 	Service string `json:"service"`
-	ID string `json:"id"`
+	ID      string `json:"id"`
 	Command struct {
 		Name   string `json:"name"`
 		Params interface{}
@@ -37,26 +37,26 @@ type Reading struct {
 }
 
 type LightStatus struct {
-	Id              string           `json:"id"`
-	Name            string           `json:"name"`
-	Service         string           `json:"service"`
-	Characteristic  StLightCharacteristic `json:"characteristic"`
+	Id             string                `json:"id"`
+	Name           string                `json:"name"`
+	Service        string                `json:"service"`
+	Characteristic StLightCharacteristic `json:"characteristic"`
 }
 
 type StLightCharacteristic struct {
-	Brightness     int         `json:"brightness"`
-	On             bool        `json:"on"` 
+	Brightness int  `json:"brightness"`
+	On         bool `json:"on"`
 }
 
 type CurtainStatus struct {
-	Id              string           `json:"id"`
-	Name            string           `json:"name"`
-	Service         string           `json:"service"`
-	Characteristic  StCurtainCharacteristic `json:"characteristic"`
+	Id             string                  `json:"id"`
+	Name           string                  `json:"name"`
+	Service        string                  `json:"service"`
+	Characteristic StCurtainCharacteristic `json:"characteristic"`
 }
 
 type StCurtainCharacteristic struct {
-	Percent        int		   `json:"percent"` 
+	Percent int `json:"percent"`
 }
 
 var Statusport string
@@ -95,24 +95,24 @@ func ZmqInit() {
 				//var name = device.Accessarysenders[i].Name
 				var deviceid = device.Accessarysenders[i].ID
 				for n := range device.Accessarysenders[i].Commands {
-				//	switch device.Accessarysenders[i].Commands[n].Name {
+					//	switch device.Accessarysenders[i].Commands[n].Name {
 					// case "Light":
 					// 	var commandid = device.Accessarysenders[i].Commands[n].ID
 					// 	statuscommand := commandform(commandid, deviceid)
 					// 	result := httpsender.GetMessage(statuscommand)
 					// 	fmt.Println("123", result)
 					// 	EventHanler(result)
-			//		case "brightness":
-						var commandid = device.Accessarysenders[i].Commands[n].ID
-						statuscommand := commandform(commandid, deviceid)
-						fmt.Println("send",statuscommand)
-						result := httpsender.GetMessage(statuscommand)
-						fmt.Println("result",result)
-						EventHanler(result)
-		//			case "percent":
+					//		case "brightness":
+					var commandid = device.Accessarysenders[i].Commands[n].ID
+					statuscommand := commandform(commandid, deviceid)
+					fmt.Println("send", statuscommand)
+					result := httpsender.GetMessage(statuscommand)
+					fmt.Println("result", result)
+					EventHanler(result)
+					//			case "percent":
 
-		//			default:
-		//			}
+					//			default:
+					//			}
 
 				}
 
@@ -157,30 +157,30 @@ func ZmqInit() {
 
 		//发送具体的命令
 
-	}  
+	}
 
 }
 
-func getEdgexParams(commandzmq CommandZmq) string{
+func getEdgexParams(commandzmq CommandZmq) string {
 	params := commandzmq.Command.Params
 	var edgexParams string
-	data :=make(map[string]string)
-if params.(map[string]interface{})["onOrOff"] != nil{
-onoroff := params.(map[string]interface{})["onOrOff"].(bool)
-if onoroff {
-data["brightness"] = "100"
-}else{
-	data["brightness"] = "0"
-}
-}else if params.(map[string]interface{})["percent"] != nil{
-	 percent := params.(map[string]interface{})["percent"].(float64)
-	 data["percent"] = strconv.FormatInt(int64(percent), 10)
-}else{
-fmt.Println("other type")
-}
-datajson,_ :=json.Marshal(data)
-edgexParams =string(datajson)
-return edgexParams
+	data := make(map[string]string)
+	if params.(map[string]interface{})["onOrOff"] != nil {
+		onoroff := params.(map[string]interface{})["onOrOff"].(bool)
+		if onoroff {
+			data["brightness"] = "100"
+		} else {
+			data["brightness"] = "0"
+		}
+	} else if params.(map[string]interface{})["percent"] != nil {
+		percent := params.(map[string]interface{})["percent"].(float64)
+		data["percent"] = strconv.FormatInt(int64(percent), 10)
+	} else {
+		fmt.Println("other type")
+	}
+	datajson, _ := json.Marshal(data)
+	edgexParams = string(datajson)
+	return edgexParams
 }
 
 func sendcommand(proxyid string, params string) {
@@ -247,40 +247,41 @@ func EventHanler(bd string) {
 		log.Println(err)
 		return
 	}
+	log.Printf("event from edgex - %v", event)
 	devicename := event.Device
 	for i := range device.Accessaries {
 		defaultname := device.Accessaries[i].Name
 		defaultid := device.Accessaries[i].ProxyID
 		defaulttype := device.Accessaries[i].Service
 		if defaultname == devicename {
+			log.Printf("devicename match - %v", devicename)
 			var lightstatus LightStatus
 			var curtainstatus CurtainStatus
 			for j := range event.Readings {
-				switch event.Readings[j].Name{
+				switch event.Readings[j].Name {
 				case "brightness":
-					lightstatus.Characteristic.Brightness,_ = strconv.Atoi(event.Readings[j].Value)
+					log.Printf("device:%v brightness->%v", devicename, event.Readings[j].Value)
+					lightstatus.Characteristic.Brightness, _ = strconv.Atoi(event.Readings[j].Value)
 					if lightstatus.Characteristic.Brightness > 0 {
 						lightstatus.Characteristic.On = true
-					}else{
+					} else {
 						lightstatus.Characteristic.On = false
 					}
 					lightstatus.Id = defaultid
 					lightstatus.Name = defaultname
 					lightstatus.Service = defaulttype
-					status["status"] = lightstatus	
+					status["status"] = lightstatus
 				case "percent":
-					curtainstatus.Characteristic.Percent,_ = strconv.Atoi(event.Readings[j].Value)
+					curtainstatus.Characteristic.Percent, _ = strconv.Atoi(event.Readings[j].Value)
 					curtainstatus.Id = defaultid
 					curtainstatus.Name = defaultname
 					curtainstatus.Service = defaulttype
-					status["status"] = curtainstatus	
+					status["status"] = curtainstatus
 				default:
 					return
 				}
 			}
 
-
-		
 		}
 	}
 
@@ -289,10 +290,11 @@ func EventHanler(bd string) {
 		log.Printf("zmq bind to %s", Statusport)
 		_ = newPublisher.Bind(Statusport)
 		time.Sleep(200 * time.Millisecond)
-		fmt.Println("send to js ", string(data))
+		log.Println("send to js ", string(data))
 		_, _ = newPublisher.SendMessage("status", data)
+	} else {
+		log.Println("Statusport null")
 	}
-
 
 }
 
