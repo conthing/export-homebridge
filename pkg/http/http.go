@@ -107,6 +107,5 @@ func Put(commandstring string, params string) {
 	}
 
 	defer res.Body.Close()
-	body, _ := ioutil.ReadAll(res.Body)
-	fmt.Println(string(body))
+	_, _ = ioutil.ReadAll(res.Body)
 }

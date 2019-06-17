@@ -103,7 +103,9 @@ func Decode(jsonStr []byte) {
 		accessarysender.Service = item.Profile.Name
 		command := accessarysender.Commands
 		for i := 0; i < len(item.Profile.Commands); i++ {
-			command = append(command, item.Profile.Commands[i])
+			if item.Profile.Commands[i].Name == "brightness" || item.Profile.Commands[i].Name == "percent"{
+				command = append(command, item.Profile.Commands[i])
+			}
 		}
 		accessarysender.Commands = command
 
@@ -119,7 +121,7 @@ case "Curtain":
 	Accessaries = append(Accessaries, accessary)
 	Accessarysenders = append(Accessarysenders, accessarysender) //store deviceid and commandid
 default:
-	fmt.Println("不存相应设备")
+	fmt.Println("不存在相应设备")
 
 }
 
@@ -136,7 +138,6 @@ default:
 		return
 	}
 
-	fmt.Println(string(b))
 	return
 }
 

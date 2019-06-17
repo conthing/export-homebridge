@@ -105,9 +105,7 @@ func ZmqInit() {
 			//		case "brightness":
 						var commandid = device.Accessarysenders[i].Commands[n].ID
 						statuscommand := commandform(commandid, deviceid)
-						fmt.Println("send",statuscommand)
 						result := httpsender.GetMessage(statuscommand)
-						fmt.Println("result",result)
 						EventHanler(result)
 		//			case "percent":
 
@@ -188,29 +186,18 @@ func sendcommand(proxyid string, params string) {
 		deviceid := device.Accessarysenders[j].ID
 		if deviceid == proxyid {
 			for k := range device.Accessarysenders[j].Commands {
-				commandid := device.Accessarysenders[j].Commands[k].ID
-				controlcommand := commandform(commandid, deviceid)
-				httpsender.Put(controlcommand, params)
-				// switch device.Accessarysenders[j].Commands[k].Name {
-				// case "Light":
-				// 	fmt.Println("in Light")
-				// 	commandid := device.Accessarysenders[j].Commands[k].ID
-				// 	controlcommand := commandform(commandid, deviceid)
-				// 	httpsender.Put(controlcommand, params)
-				// case "brightness":
-				// 	fmt.Println("in Brightness")
-				// 	commandid := device.Accessarysenders[j].Commands[k].ID
-				// 	controlcommand := commandform(commandid, deviceid)
-				// 	httpsender.Put(controlcommand, params)
-				// case "Percent":
-				// 	fmt.Println("in Brightness")
-				// 	commandid := device.Accessarysenders[j].Commands[k].ID
-				// 	controlcommand := commandform(commandid, deviceid)
-				// 	httpsender.Put(controlcommand, params)
-				// default:
-				// 	fmt.Println("in default")
-				// }
-
+				switch device.Accessarysenders[j].Commands[k].Name {
+				case "brightness":
+					commandid := device.Accessarysenders[j].Commands[k].ID
+					controlcommand := commandform(commandid, deviceid)
+					httpsender.Put(controlcommand, params)
+				case "percent":
+					commandid := device.Accessarysenders[j].Commands[k].ID
+					controlcommand := commandform(commandid, deviceid)
+					httpsender.Put(controlcommand, params)
+				default:
+					fmt.Println("in default")
+				}
 			}
 		}
 	}
