@@ -224,7 +224,7 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 	//4.对收到的event进行处理，然后发给js   status
 }
 
-func EventHanler(bd string) {
+func EventHanler(bd string) { 
 	var event Event
 	var status map[string]interface{}
 	status = make(map[string]interface{})
@@ -277,7 +277,8 @@ func EventHanler(bd string) {
 		_ = newPublisher.Bind(Statusport)
 		time.Sleep(200 * time.Millisecond)
 		fmt.Println("send to js ", string(data))
-		_, _ = newPublisher.SendMessage("status", data)
+		result, _ := newPublisher.SendMessage("status", data)
+		log.Println(result)
 	}
 
 
