@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
-	"log"
 
 	"github.com/conthing/export-homebridge/pkg/device"
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
@@ -18,12 +18,11 @@ func HttpPost() {
 	reg := models.Registration{}
 	reg.Name = "RESTXMLClient"
 	reg.Format = "JSON"
-	reg.Filter.ValueDescriptorIDs = []string{"brightness","percent","moving"}
+	reg.Filter.ValueDescriptorIDs = []string{"brightness", "percent", "moving"}
 	reg.Enable = true
 	reg.Destination = "REST_ENDPOINT"
-	reg.Addressable = models.Addressable{Name:"EdgeXTestRESTXML" , Protocol:"HTTP" , HTTPMethod:"POST" ,
-	Address:"localhost" , Port:8111 , Path:"/rest"}
-	
+	reg.Addressable = models.Addressable{Name: "EdgeXTestRESTXML", Protocol: "HTTP", HTTPMethod: "POST",
+		Address: "localhost", Port: 8111, Path: "/rest"}
 
 	// var registration map[string]interface{}
 	// var addressable map[string]interface{}
@@ -41,7 +40,10 @@ func HttpPost() {
 	// registration["enable"] = true
 	// registration["destination"] = "REST_ENDPOINT"
 	// registration["addressable"] = addressable
-	data, _ := json.Marshal(reg)
+	data, err := json.Marshal(reg)
+	if err != nil {
+		return
+	}
 
 	//str := "{\"origin\":1471806386919,\"name\":\"RESTXMLClient\",\"addressable\":{\"origin\":1471806386919,\"name\":\"EdgeXTestRESTXML\",\"protocol\":\"HTTP\",\"method\": \"POST\",\"address\":\"localhost\",\"port\":8111,\"path\":\"/rest\"},\"format\":\"JSON\",\"enable\":true,\"destination\":\"REST_ENDPOINT\"}"
 
@@ -54,7 +56,12 @@ func HttpPost() {
 		return
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil {
+			return
+		}
+	}()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		// handle error
@@ -69,32 +76,43 @@ func HttpPost() {
 	device.Decode([]byte(devicelist))
 }
 
-func GetMessage(msg string) string {
+func GetMessage(msg string) []byte {
 	resp, err := http.Get(msg)
 	if err != nil {
 		log.Println(err)
-		return ""
+		return nil
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil {
+			return
+		}
+	}()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		// handle error
 		log.Println(err)
-		return ""
+		return nil
 	}
 
-	result := string(body)
+	//result := string(body)
 
-	log.Println(string(body))
+	//log.Println(string(body))
 
-	return result
+	return body
 }
 
-func Put(commandstring string, params string) {
+func Put(commandstring string, params string) (status string) {
+
+	fmt.Println("commandstring :", commandstring)
+	fmt.Println("params :", params)
 
 	payload := strings.NewReader(params)
-	req, _ := http.NewRequest("PUT", commandstring, payload)
+	req, err := http.NewRequest("PUT", commandstring, payload)
+	if err != nil {
+		return ""
+	}
 
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Authorization", "bmgAAGI155F6MJ3N2Tk9ruL_6XQpx-uxkkg:yKx_OYDtI3njD7-c7Y87Oov0GpI=:eyJyZXNvdXJBvcy93aF9mbG93RGF0YVNvdXJjZTEiLCJleHBpcmVzIjoxNTM2NzU1MjkwLCJjb250ZW50TUQ1IjoiIiwiY29udGVudFR5cGUiOiJhcHBsaWNhdGlvbi9qc29uIiwiaGVhZGVycyI6IiIsIm1ldGhvZCI6IlBVVCJ9")
@@ -105,7 +123,13 @@ func Put(commandstring string, params string) {
 		fmt.Println(err)
 		return
 	}
-
-	defer res.Body.Close()
-	_, _ = ioutil.ReadAll(res.Body)
+	status = res.Status
+	defer func() {
+		err = res.Body.Close()
+		if err != nil {
+			return
+		}
+	}()
+	//result, _ = ioutil.ReadAll(res.Body)
+	return
 }
