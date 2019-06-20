@@ -9,6 +9,7 @@ import (
 	//	"time"
 
 	"github.com/conthing/export-homebridge/pkg/device"
+	"github.com/conthing/export-homebridge/pkg/errorHandle"
 	httpsender "github.com/conthing/export-homebridge/pkg/http"
 	"github.com/gorilla/mux"
 	zmq "github.com/pebbe/zmq4"
@@ -65,41 +66,47 @@ var newPublisher *zmq.Socket
 
 //var statusReq *zmq.Socket
 
-func ZmqInit() {
+func ZmqInit() error {
 	context, err := zmq.NewContext()
 	if err != nil {
-		return
+		return errorHandle.ErrContextFail
 	}
 	commandRep, err := context.NewSocket(zmq.REP)
 	if err != nil {
-		return
+		return errorHandle.ErrSocketFail
 	}
 	defer func() {
-		_ = commandRep.Close()
+		err = commandRep.Close()
+		if err != nil {
+			return
+		}
 	}()
 
 	// context1,_ := zmq.NewContext()
 	// statusReq,_ = context1.NewSocket(zmq.REQ)
 
-	_ = commandRep.Connect("tcp://127.0.0.1:9998")
+	err = commandRep.Connect("tcp://127.0.0.1:9998")
+	if err != nil {
+		return errorHandle.ErrConnectFail
+	}
 
 	var commandzmq CommandZmq
 
 	for {
 		msg, err := commandRep.Recv(0) //recieve message by commandrep
 		if err != nil {
-			return
+			return errorHandle.ErrRevFail
 		}
 		msgbyte := []byte(msg)
 		err = json.Unmarshal([]byte(msgbyte), &commandzmq)
 		if err != nil {
 			log.Println(err)
-			return
+			return errorHandle.ErrUnmarshalFail
 		}
 		fmt.Println("Got", string(msg))
 		_, err = commandRep.Send(msg, 0)
 		if err != nil {
-			return
+			return errorHandle.ErrSendFail
 		}
 		if commandzmq.Command.Name == "init" {
 			Statusport = commandzmq.Command.Params.(map[string]interface{})["statusport"].(string)
@@ -107,12 +114,12 @@ func ZmqInit() {
 
 			newPublisher, err := zmq.NewSocket(zmq.PUB)
 			if err != nil {
-				return
+				return errorHandle.ErrSocketFail
 			}
 			log.Printf("zmq bind to %s", Statusport)
 			err = newPublisher.Bind(Statusport)
 			if err != nil {
-				return
+				return errorHandle.ErrBindFail
 			}
 
 			//qrcode := commandzmq.Command.Params.QRcode
@@ -131,8 +138,14 @@ func ZmqInit() {
 					//		case "brightness":
 					var commandid = device.Accessarysenders[i].Commands[n].ID
 					statuscommand := commandform(commandid, deviceid)
-					result := httpsender.GetMessage(statuscommand)
-					EventHanler(string(result))
+					result, err := httpsender.GetMessage(statuscommand)
+					if err != nil {
+						return err
+					}
+					err = EventHanler(string(result))
+					if err != nil {
+						return err
+					}
 					//			case "percent":
 
 					//			default:
@@ -142,7 +155,10 @@ func ZmqInit() {
 
 			}
 		} else {
-			params := getEdgexParams(commandzmq)
+			params, err := getEdgexParams(commandzmq)
+			if err != nil {
+				return err
+			}
 			id := commandzmq.ID
 			sendcommand(id, params)
 			//			switch commandzmq.Service {
@@ -185,9 +201,8 @@ func ZmqInit() {
 
 }
 
-func getEdgexParams(commandzmq CommandZmq) string {
+func getEdgexParams(commandzmq CommandZmq) (edgexParams string, err error) {
 	params := commandzmq.Command.Params
-	var edgexParams string
 	data := make(map[string]string)
 	if params.(map[string]interface{})["onOrOff"] != nil {
 		onoroff := params.(map[string]interface{})["onOrOff"].(bool)
@@ -204,10 +219,10 @@ func getEdgexParams(commandzmq CommandZmq) string {
 	}
 	datajson, err := json.Marshal(data)
 	if err != nil {
-		return ""
+		return "", errorHandle.ErrMarshalFail
 	}
 	edgexParams = string(datajson)
-	return edgexParams
+	return edgexParams, nil
 }
 
 func sendcommand(proxyid string, params string) {
@@ -219,12 +234,18 @@ func sendcommand(proxyid string, params string) {
 				case "brightness":
 					commandid := device.Accessarysenders[j].Commands[k].ID
 					controlcommand := commandform(commandid, deviceid)
-					result := httpsender.Put(controlcommand, params)
+					result, err := httpsender.Put(controlcommand, params)
+					if err != nil {
+						return
+					}
 					fmt.Println("put result", string(result))
 				case "percent":
 					commandid := device.Accessarysenders[j].Commands[k].ID
 					controlcommand := commandform(commandid, deviceid)
-					result := httpsender.Put(controlcommand, params)
+					result, err := httpsender.Put(controlcommand, params)
+					if err != nil {
+						return
+					}
 					fmt.Println("put result", string(result))
 				default:
 					fmt.Println("in default")
@@ -249,26 +270,32 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}()
-	buf := make([]byte, 1024) // 1024为缓存大小，即每次读出的最大数据
-	n, _ := r.Body.Read(buf)  // 为这次读出的数据大小
+	buf := make([]byte, 1024)  // 1024为缓存大小，即每次读出的最大数据
+	n, err := r.Body.Read(buf) // 为这次读出的数据大小
+	if err != nil {
+		return
+	}
 
 	var bd string
 	bd = string(buf[:n])
 	log.Print("222", bd)
 
-	EventHanler(bd)
+	err = EventHanler(bd)
+	if err != nil {
+		return
+	}
 	//4.对收到的event进行处理，然后发给js   status
 }
 
-func EventHanler(bd string) {
+func EventHanler(bd string) (err error) {
 	var event Event
 	var status map[string]interface{}
 	status = make(map[string]interface{})
 	bytestr := []byte(bd)
-	err := json.Unmarshal([]byte(bytestr), &event)
+	err = json.Unmarshal([]byte(bytestr), &event)
 	if err != nil {
 		log.Println(err)
-		return
+		return errorHandle.ErrReadFail
 	}
 	devicename := event.Device
 	for i := range device.Accessaries {
@@ -307,13 +334,13 @@ func EventHanler(bd string) {
 
 	data, err := json.MarshalIndent(status, "", " ")
 	if err != nil {
-		return
+		return errorHandle.ErrMarshalFail
 	}
 	if Statusport != "" {
 		fmt.Println("send to js ", string(data))
 		result, err := newPublisher.SendMessage("status", data)
 		if err != nil {
-			return
+			return errorHandle.ErrSendFail
 		}
 		fmt.Println(result)
 	}
@@ -325,7 +352,7 @@ func EventHanler(bd string) {
 	// 	fmt.Println("send to js ", string(data))
 	// 	statusReq.Send(string(data))
 	// }
-
+	return
 }
 
 //LoadRestRoutes 定义REST资源

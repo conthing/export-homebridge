@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/conthing/export-homebridge/pkg/device"
+	"github.com/conthing/export-homebridge/pkg/errorHandle"
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
 )
 
@@ -72,15 +73,16 @@ func HttpPost() {
 	log.Println(string(body))
 
 	devicelisturl := "http://localhost:48081/api/v1/device"
-	var devicelist = GetMessage(devicelisturl)
-	device.Decode([]byte(devicelist))
+	var devicelist, _ = GetMessage(devicelisturl)
+	b, err := device.Decode([]byte(devicelist))
+	fmt.Print(b)
 }
 
-func GetMessage(msg string) []byte {
+func GetMessage(msg string) (body []byte, err error) {
 	resp, err := http.Get(msg)
 	if err != nil {
 		log.Println(err)
-		return nil
+		return nil, errorHandle.ErrGetFail
 	}
 
 	defer func() {
@@ -89,21 +91,21 @@ func GetMessage(msg string) []byte {
 			return
 		}
 	}()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		// handle error
 		log.Println(err)
-		return nil
+		return nil, errorHandle.ErrReadFail
 	}
 
 	//result := string(body)
 
 	//log.Println(string(body))
 
-	return body
+	return
 }
 
-func Put(commandstring string, params string) (status string) {
+func Put(commandstring string, params string) (status string, err error) {
 
 	fmt.Println("commandstring :", commandstring)
 	fmt.Println("params :", params)
@@ -111,7 +113,7 @@ func Put(commandstring string, params string) (status string) {
 	payload := strings.NewReader(params)
 	req, err := http.NewRequest("PUT", commandstring, payload)
 	if err != nil {
-		return ""
+		return "", errorHandle.ErrRequestFail
 	}
 
 	req.Header.Add("Content-Type", "application/json")
@@ -121,7 +123,7 @@ func Put(commandstring string, params string) (status string) {
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Println(err)
-		return
+		return "", errorHandle.ErrPutFail
 	}
 	status = res.Status
 	defer func() {
