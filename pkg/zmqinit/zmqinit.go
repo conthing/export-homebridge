@@ -161,41 +161,7 @@ func ZmqInit() error {
 			}
 			id := commandzmq.ID
 			sendcommand(id, params)
-			//			switch commandzmq.Service {
-			//			case "LightBulb":
-			//				sendcommand(proxyid, params)
-			//				fmt.Println("sevice is Light")
-			//			case "WindowCovering":
-			//				fmt.Println("sevice is WindowCovering")
-			//			case "Thermostat":
-			//				fmt.Println("sevice is LiThermostatght")
-			//			case "Window":
-			//				fmt.Println("sevice is Window")
-			//			case "Door":
-			//				fmt.Println("sevice is Door")
-			//			case "Lock":
-			//				fmt.Println("sevice is Lock")
-			//			case "Switch":
-			//				fmt.Println("sevice is Switch")
-			//			case "Fan":
-			//				fmt.Println("sevice is Fan")
-			//			case "Fanv2":
-			//				fmt.Println("sevice is Fanv2")
-			//			default:
-			//				fmt.Println("default")
-			//			} //根据不同类型进行分类 switch case
-
-			//name := commandzmq.Name
-			//switch commandzmq.Name {
-			//case "Light":
-
-			//case "Curtain":
-
-			//}
-
 		}
-
-		//发送具体的命令
 
 	}
 
