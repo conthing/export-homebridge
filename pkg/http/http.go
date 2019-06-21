@@ -98,10 +98,6 @@ func GetMessage(msg string) (body []byte, err error) {
 		return nil, errorHandle.ErrReadFail
 	}
 
-	//result := string(body)
-
-	//log.Println(string(body))
-
 	return
 }
 

@@ -2,7 +2,6 @@ package device
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/conthing/export-homebridge/pkg/errorHandle"
 	"io/ioutil"
