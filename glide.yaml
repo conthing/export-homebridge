@@ -1,4 +1,0 @@
-package: github.com/conthing/careyes-driver
-import:
-- package: github.com/howeyc/crc16
-- package: github.com/tarm/goserial
