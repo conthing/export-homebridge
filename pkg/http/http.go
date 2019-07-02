@@ -72,10 +72,12 @@ func HttpPost() {
 
 	log.Println(string(body))
 
-	devicelisturl := "http://localhost:48081/api/v1/device"
-	var devicelist, _ = GetMessage(devicelisturl)
-	b, err := device.Decode([]byte(devicelist))
-	fmt.Print(b)
+	labels := []string{"Light", "Keypad"}
+	for _, label := range labels {
+		projectUrl := "http://localhost:52030/api/v1/project/" + label
+		var projectlist, _ = GetMessage(projectUrl)
+		device.Decode(projectlist, label)
+	}
 }
 
 func GetMessage(msg string) (body []byte, err error) {
