@@ -60,13 +60,12 @@ type StCurtainCharacteristic struct {
 	Percent int `json:"percent"`
 }
 
-var Statusport string
 var QRcode string
 var newPublisher *zmq.Socket
 
 //var statusReq *zmq.Socket
 
-func ZmqInit() error {
+func ZmqInit(statusport string) error {
 	context, err := zmq.NewContext()
 	if err != nil {
 		return errorHandle.ErrContextFail
@@ -90,6 +89,16 @@ func ZmqInit() error {
 		return errorHandle.ErrConnectFail
 	}
 
+	newPublisher, err := zmq.NewSocket(zmq.PUB)
+	if err != nil {
+		return errorHandle.ErrSocketFail
+	}
+	log.Printf("zmq bind to %s", statusport)
+	err = newPublisher.Bind(statusport)
+	if err != nil {
+		return errorHandle.ErrBindFail
+	}
+
 	var commandzmq CommandZmq
 
 	for {
@@ -109,18 +118,7 @@ func ZmqInit() error {
 			return errorHandle.ErrSendFail
 		}
 		if commandzmq.Command.Name == "init" {
-			Statusport = commandzmq.Command.Params.(map[string]interface{})["statusport"].(string)
 			QRcode = commandzmq.Command.Params.(map[string]interface{})["QRcode"].(string)
-
-			newPublisher, err := zmq.NewSocket(zmq.PUB)
-			if err != nil {
-				return errorHandle.ErrSocketFail
-			}
-			log.Printf("zmq bind to %s", Statusport)
-			err = newPublisher.Bind(Statusport)
-			if err != nil {
-				return errorHandle.ErrBindFail
-			}
 
 			//qrcode := commandzmq.Command.Params.QRcode
 			for i := range device.Accessarysenders {
@@ -302,22 +300,13 @@ func EventHanler(bd string) (err error) {
 	if err != nil {
 		return errorHandle.ErrMarshalFail
 	}
-	if Statusport != "" {
-		fmt.Println("send to js ", string(data))
-		result, err := newPublisher.SendMessage("status", data)
-		if err != nil {
-			return errorHandle.ErrSendFail
-		}
-		fmt.Println(result)
+	fmt.Println("send to js ", string(data))
+	result, err := newPublisher.SendMessage("status", data)
+	if err != nil {
+		return errorHandle.ErrSendFail
 	}
+	fmt.Println(result)
 
-	// if Statusport != "" {
-	// 	log.Printf("zmq bind to %s", Statusport)
-	// 	statusReq.Bind(Statusport)
-	// 	time.Sleep(200 * time.Millisecond)
-	// 	fmt.Println("send to js ", string(data))
-	// 	statusReq.Send(string(data))
-	// }
 	return
 }
 

@@ -29,6 +29,7 @@ type Config struct {
 //HTTPConfig is the port from config
 type HTTPConfig struct {
 	Port int
+	Statusport string
 }
 
 //CommandConfig is the data from config
@@ -60,10 +61,6 @@ func main() {
 
 	cfg := &Config{}
 
-	httpsender.HttpPost()
-
-	go zmqinit.ZmqInit()
-
 	//ReadFile函数会读取文件的全部内容，并将结果以[]byte类型返回
 	data, err := ioutil.ReadFile(profile)
 	if err != nil {
@@ -77,6 +74,10 @@ func main() {
 		log.Println(err)
 		return
 	}
+
+	httpsender.HttpPost(cfg.HTTP.Statusport)
+
+	go zmqinit.ZmqInit(cfg.HTTP.Statusport)
 
 	errs := make(chan error, 3)
 	listenForInterrupt(errs)

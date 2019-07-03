@@ -5,7 +5,8 @@
         "readtimeout":1000000000
     },
     "http":{
-        "port":8111
+        "port":8111,
+        "statusport":"tcp://127.0.0.1:9999"
     },
     "commands":[
         {

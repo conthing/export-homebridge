@@ -14,7 +14,7 @@ import (
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
 )
 
-func HttpPost() {
+func HttpPost(statusport string) {
 
 	reg := models.Registration{}
 	reg.Name = "RESTXMLClient"
@@ -76,7 +76,7 @@ func HttpPost() {
 	for _, label := range labels {
 		projectUrl := "http://localhost:52030/api/v1/project/" + label
 		var projectlist, _ = GetMessage(projectUrl)
-		device.Decode(projectlist, label)
+		device.Decode(projectlist, label, statusport)
 	}
 }
 
