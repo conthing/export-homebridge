@@ -75,11 +75,11 @@ var Accessaries []Accessary
 var Accessarysenders []Accessarysender
 var Pincode string
 
-func Decode(jsonStr string, label string, statusport string) {
+func Decode(jsonStr []byte, label string, statusport string) {
 
 	var projects []Project
 
-	err := json.Unmarshal([]byte(jsonStr), &projects)
+	err := json.Unmarshal(jsonStr, &projects)
 	if err != nil {
 		log.Println(err)
 		return
@@ -170,7 +170,7 @@ func createConfigData(accessaries []Accessary, statusport string) (configdata Au
 			Model:        "homebridge-inSona",
 			Manufacturer: "inSona",
 			Username:     username,
-			Repport:      statusport,
+			Repport:      "tcp://127.0.0.1:9999",
 		},
 		Platforms: []Platform{
 			{

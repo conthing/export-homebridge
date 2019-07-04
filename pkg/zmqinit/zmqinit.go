@@ -94,7 +94,7 @@ func ZmqInit(statusport string) error {
 		return errorHandle.ErrSocketFail
 	}
 	log.Printf("zmq bind to %s", statusport)
-	err = newPublisher.Bind(statusport)
+	err = newPublisher.Bind("tcp://127.0.0.1:9999")
 	if err != nil {
 		return errorHandle.ErrBindFail
 	}
@@ -301,11 +301,16 @@ func EventHanler(bd string) (err error) {
 		return errorHandle.ErrMarshalFail
 	}
 	fmt.Println("send to js ", string(data))
-	result, err := newPublisher.SendMessage("status", data)
-	if err != nil {
-		return errorHandle.ErrSendFail
+	if newPublisher!=nil{
+		if data != nil{
+			result, err := newPublisher.SendMessage("status", data)
+			if err != nil {
+				return errorHandle.ErrSendFail
+			}
+			fmt.Println(result)
+		}
 	}
-	fmt.Println(result)
+	
 
 	return
 }
