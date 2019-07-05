@@ -12,4 +12,5 @@ require (
 	github.com/pebbe/zmq4 v1.0.0
 	github.com/stretchr/testify v1.3.0
 	github.com/tarm/goserial v0.0.0-20151007205400-b3440c3c6355
+	github.com/conthing/utils v0.0.0-20190628065313-d7175d360e12
 )

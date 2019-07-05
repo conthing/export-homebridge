@@ -170,7 +170,7 @@ func createConfigData(accessaries []Accessary, statusport string) (configdata Au
 			Model:        "homebridge-inSona",
 			Manufacturer: "inSona",
 			Username:     username,
-			Repport:      "tcp://127.0.0.1:9999",
+			Repport:      statusport,
 		},
 		Platforms: []Platform{
 			{

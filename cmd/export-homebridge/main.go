@@ -1,10 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +14,7 @@ import (
 	httpsender "github.com/conthing/export-homebridge/pkg/http"
 	zmqinit "github.com/conthing/export-homebridge/pkg/zmqinit"
 	"github.com/gorilla/context"
+	"github.com/conthing/utils/common"
 	serial "github.com/tarm/goserial"
 )
 
@@ -28,8 +27,8 @@ type Config struct {
 
 //HTTPConfig is the port from config
 type HTTPConfig struct {
-	Port int
-	Statusport string
+	Port int `json:"port"`
+	Statusport string `json:"statusport"`
 }
 
 //CommandConfig is the data from config
@@ -51,33 +50,33 @@ type Status struct {
 	Characteristic map[string]interface{}
 }
 
+var cfg  = Config{}
+
 func main() {
 	start := time.Now()
-	var profile string
+	var cfgfile string
 
-	flag.StringVar(&profile, "profile", "config.json", "Specify a profile other than default.")
-	flag.StringVar(&profile, "p", "config.json", "Specify a profile other than default.")
+	flag.StringVar(&cfgfile, "config", "configuration.toml", "Specify a profile other than default.")
+	flag.StringVar(&cfgfile, "c", "configuration.toml", "Specify a profile other than default.")
 	flag.Parse()
 
-	cfg := &Config{}
+	common.InitLogger(&common.LoggerConfig{Level: "DEBUG", SkipCaller: true})
 
-	//ReadFile函数会读取文件的全部内容，并将结果以[]byte类型返回
-	data, err := ioutil.ReadFile(profile)
+	err := common.LoadConfig(cfgfile, &cfg)
 	if err != nil {
-		log.Println(err)
+		common.Log.Errorf("failed to load config %v", err)
 		return
 	}
 
-	//读取的数据为json格式，需要进行解码
-	err = json.Unmarshal(data, cfg)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+
+	fmt.Println("statusport: ",cfg.HTTP.Statusport)
+	fmt.Println("port: ",cfg.HTTP.Port)
 
 	httpsender.HttpPost(cfg.HTTP.Statusport)
 
-	go zmqinit.ZmqInit(cfg.HTTP.Statusport)
+	_ = zmqinit.InitZmq(cfg.HTTP.Statusport)
+
+	go zmqinit.ZmqInit()
 
 	errs := make(chan error, 3)
 	listenForInterrupt(errs)

@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	//	"time"
+	"time"
 
 	"github.com/conthing/export-homebridge/pkg/device"
 	"github.com/conthing/export-homebridge/pkg/errorHandle"
@@ -65,7 +65,23 @@ var newPublisher *zmq.Socket
 
 //var statusReq *zmq.Socket
 
-func ZmqInit(statusport string) error {
+
+func InitZmq(statusport string) error {
+	var err error
+	newPublisher, err = zmq.NewSocket(zmq.PUB)
+	if err != nil {
+		return errorHandle.ErrSocketFail
+	}
+	fmt.Println("zmq bind to ", statusport)
+	err = newPublisher.Bind(statusport)
+	{
+		return errorHandle.ErrBindFail
+	}
+	time.Sleep(200 * time.Millisecond)
+	return nil
+}
+
+func ZmqInit() error {
 	context, err := zmq.NewContext()
 	if err != nil {
 		return errorHandle.ErrContextFail
@@ -89,15 +105,6 @@ func ZmqInit(statusport string) error {
 		return errorHandle.ErrConnectFail
 	}
 
-	newPublisher, err := zmq.NewSocket(zmq.PUB)
-	if err != nil {
-		return errorHandle.ErrSocketFail
-	}
-	log.Printf("zmq bind to %s", statusport)
-	err = newPublisher.Bind("tcp://127.0.0.1:9999")
-	if err != nil {
-		return errorHandle.ErrBindFail
-	}
 
 	var commandzmq CommandZmq
 
@@ -227,6 +234,7 @@ func commandform(commandid string, deviceid string) string {
 
 func commandHandler(w http.ResponseWriter, r *http.Request) {
 	log.Print("writer", w, "HTTP ", r.Method, " ", r.URL)
+	log.Print("r.body: ",r.Body)
 
 	defer func() {
 		err := r.Body.Close()
@@ -235,19 +243,24 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	buf := make([]byte, 1024)  // 1024为缓存大小，即每次读出的最大数据
-	n, err := r.Body.Read(buf) // 为这次读出的数据大小
-	if err != nil {
-		return
-	}
-
+	n, _ := r.Body.Read(buf) // 为这次读出的数据大小
+	log.Print("n: ", n)
+	// if err != nil {
+	// 	log.Print(err)
+	// 	return
+	// }
 	var bd string
 	bd = string(buf[:n])
 	log.Print("222", bd)
 
-	err = EventHanler(bd)
+
+
+
+	err := EventHanler(bd)
 	if err != nil {
 		return
 	}
+	
 	//4.对收到的event进行处理，然后发给js   status
 }
 
@@ -255,6 +268,7 @@ func EventHanler(bd string) (err error) {
 	var event Event
 	var status map[string]interface{}
 	status = make(map[string]interface{})
+	fmt.Println("收到的event： ",bd)
 	bytestr := []byte(bd)
 	err = json.Unmarshal([]byte(bytestr), &event)
 	if err != nil {
@@ -263,15 +277,18 @@ func EventHanler(bd string) (err error) {
 	}
 	devicename := event.Device
 	for i := range device.Accessaries {
-		defaultname := device.Accessaries[i].Name
+		defaultname := device.Accessarysenders[i].Name
 		defaultid := device.Accessaries[i].ProxyID
 		defaulttype := device.Accessaries[i].Service
-		if defaultname == devicename {
+		fmt.Println("defaultname: ",defaultname)
+		fmt.Println("devicename: ",devicename)
+		if devicename == defaultname {
 			var lightstatus LightStatus
 			var curtainstatus CurtainStatus
 			for j := range event.Readings {
 				switch event.Readings[j].Name {
 				case "brightness":
+					fmt.Println("in brightness")
 					lightstatus.Characteristic.Brightness, _ = strconv.Atoi(event.Readings[j].Value)
 					if lightstatus.Characteristic.Brightness > 0 {
 						lightstatus.Characteristic.On = true
@@ -282,6 +299,7 @@ func EventHanler(bd string) (err error) {
 					lightstatus.Name = defaultname
 					lightstatus.Service = defaulttype
 					status["status"] = lightstatus
+					fmt.Println("in lightstatus",lightstatus)
 				case "percent":
 					curtainstatus.Characteristic.Percent, _ = strconv.Atoi(event.Readings[j].Value)
 					curtainstatus.Id = defaultid
@@ -301,15 +319,13 @@ func EventHanler(bd string) (err error) {
 		return errorHandle.ErrMarshalFail
 	}
 	fmt.Println("send to js ", string(data))
-	if newPublisher!=nil{
-		if data != nil{
-			result, err := newPublisher.SendMessage("status", data)
-			if err != nil {
-				return errorHandle.ErrSendFail
-			}
-			fmt.Println(result)
-		}
+	fmt.Println("newPublisher: ",newPublisher)
+	if newPublisher != nil{
+		_, err = newPublisher.SendMessage("status", data)
 	}
+			
+
+
 	
 
 	return

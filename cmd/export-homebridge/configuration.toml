@@ -1,0 +1,9 @@
+[Serial]
+Name = "COM20"
+Baud = 9600
+Readtimeout = 1000000000
+
+[HTTP]
+Port = 8111
+Statusport = "tcp://127.0.0.1:9999"
+
