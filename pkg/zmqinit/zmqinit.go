@@ -62,6 +62,7 @@ type StCurtainCharacteristic struct {
 
 var QRcode string
 var newPublisher *zmq.Socket
+var statuspubport string
 
 //var statusReq *zmq.Socket
 
@@ -72,6 +73,7 @@ func InitZmq(statusport string) error {
 	if err != nil {
 		return errorHandle.ErrSocketFail
 	}
+	statuspubport = statusport
 	fmt.Println("zmq bind to ", statusport)
 	err = newPublisher.Bind(statusport)
 	{
@@ -233,8 +235,6 @@ func commandform(commandid string, deviceid string) string {
 }
 
 func commandHandler(w http.ResponseWriter, r *http.Request) {
-	log.Print("writer", w, "HTTP ", r.Method, " ", r.URL)
-	log.Print("r.body: ",r.Body)
 
 	defer func() {
 		err := r.Body.Close()
@@ -336,6 +336,7 @@ func LoadRestRoutes() http.Handler {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/rest", commandHandler).Methods(http.MethodGet, http.MethodPost)
+	r.HandleFunc("/api/v1/reboot", rebootHandler).Methods(http.MethodPost)
 	r.HandleFunc("/api/v1/homebridge/qrcode", qrcodeHandler).Methods(http.MethodGet)
 
 	return r
@@ -357,5 +358,30 @@ func qrcodeHandler(w http.ResponseWriter, r *http.Request) {
 	_, err = w.Write([]byte(datajson)) //多个homebridge的数据再组
 	if err != nil {
 		return
+	}
+}
+
+func rebootHandler(w http.ResponseWriter, r *http.Request) {
+
+	defer func() {
+		err := r.Body.Close()
+		if err != nil {
+			return
+		}
+	}()
+	buf := make([]byte, 1024)  // 1024为缓存大小，即每次读出的最大数据
+	n, _ := r.Body.Read(buf) // 为这次读出的数据大小
+
+	var bd string
+	bd = string(buf[:n])
+	log.Print("333", bd)
+
+	device.Accessaries = nil
+	device.Accessarysenders = nil
+	labels := []string{"Light","Curtain"}
+	for _, label := range labels {
+		projectUrl := "http://localhost:52030/api/v1/project/" + label
+		var projectlist, _ = httpsender.GetMessage(projectUrl)
+		device.Decode(projectlist, label, statuspubport)
 	}
 }

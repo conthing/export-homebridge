@@ -84,6 +84,7 @@ func Decode(jsonStr []byte, label string, statusport string) {
 		log.Println(err)
 		return
 	}
+	index := 0
 	// for the love of Gopher DO NOT DO THIS
 
 	for _, project := range projects {
@@ -92,9 +93,40 @@ func Decode(jsonStr []byte, label string, statusport string) {
 		accessary.ProxyID = project.Id
 		accessary.Accessory = "Control4"
 		commands := accessarysender.Commands
+		
+		switch label {
+		case "Light":
+			accessary.Service = "Lightbulb"
+		case "Curtain":
+			accessary.Service = "WindowCovering"
+		default:
+			fmt.Println("不存相应设备")
+
+		}
+
 		for _, projectcommand := range project.Commands {
 			if projectcommand.Name == "alias" {
-				accessary.Name = projectcommand.Value
+				if Accessaries != nil{
+					for _,access := range Accessaries {
+						if access.Name != projectcommand.Value{
+							fmt.Println("in name不相同")
+							fmt.Println(access.Name)
+							fmt.Println(projectcommand.Value)
+							accessary.Name = projectcommand.Value
+						}else{
+							fmt.Println("in name相同")
+							fmt.Println(access.Name)
+							fmt.Println(projectcommand.Value)
+							accessary.Name = fmt.Sprintf("%s(%d)",projectcommand.Value,index)
+							fmt.Println("accessary.Name: ",accessary.Name)
+							index++
+							break
+						}
+					}
+				}else{
+					accessary.Name = projectcommand.Value
+				}
+
 			}
 
 			var command Commands
@@ -107,19 +139,8 @@ func Decode(jsonStr []byte, label string, statusport string) {
 		accessarysender.ID = project.Id
 		accessarysender.Service = label
 
-		switch label {
-		case "Light":
-			accessary.Service = "Lightbulb"
-			Accessaries = append(Accessaries, accessary)
-			Accessarysenders = append(Accessarysenders, accessarysender) //store deviceid and commandid
-		case "Curtain":
-			accessary.Service = "WindowCovering"
-			Accessaries = append(Accessaries, accessary)
-			Accessarysenders = append(Accessarysenders, accessarysender) //store deviceid and commandid
-		default:
-			fmt.Println("不存相应设备")
-
-		}
+		Accessaries = append(Accessaries, accessary)
+		Accessarysenders = append(Accessarysenders, accessarysender) //store deviceid and commandid
 	}
 	configdata, err := createConfigData(Accessaries, statusport)
 	if err != nil {
@@ -127,14 +148,12 @@ func Decode(jsonStr []byte, label string, statusport string) {
 	}
 	b, _ := json.MarshalIndent(configdata, "", " ") //变成json字符串
 
-	fmt.Print(b)
 	err = ioutil.WriteFile("/root/.homebridge/config.json", b, os.ModeAppend) //create config.json
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	fmt.Println(string(b))
 	return
 }
 

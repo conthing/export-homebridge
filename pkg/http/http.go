@@ -72,7 +72,7 @@ func HttpPost(statusport string) {
 
 	log.Println(string(body))
 
-	labels := []string{"Light", "Keypad"}
+	labels := []string{"Light","Curtain"}
 	for _, label := range labels {
 		projectUrl := "http://localhost:52030/api/v1/project/" + label
 		var projectlist, _ = GetMessage(projectUrl)
