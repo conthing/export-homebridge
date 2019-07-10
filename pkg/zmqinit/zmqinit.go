@@ -169,13 +169,13 @@ func ZmqInit() error {
 			id := commandzmq.ID
 			sendcommand(id, params)
 		}
-
 	}
 
 }
 
 func getEdgexParams(commandzmq CommandZmq) (edgexParams string, err error) {
 	params := commandzmq.Command.Params
+	fmt.Println("params: ",params)
 	data := make(map[string]string)
 	if params.(map[string]interface{})["onOrOff"] != nil {
 		onoroff := params.(map[string]interface{})["onOrOff"].(bool)
@@ -187,7 +187,10 @@ func getEdgexParams(commandzmq CommandZmq) (edgexParams string, err error) {
 	} else if params.(map[string]interface{})["percent"] != nil {
 		percent := params.(map[string]interface{})["percent"].(float64)
 		data["percent"] = strconv.FormatInt(int64(percent), 10)
-	} else {
+	}else if params.(map[string]interface{})["brightness"] != nil {
+		brightness := params.(map[string]interface{})["brightness"].(float64)
+		data["brightness"] = strconv.FormatInt(int64(brightness), 10)
+	}else {
 		fmt.Println("other type")
 	}
 	datajson, err := json.Marshal(data)

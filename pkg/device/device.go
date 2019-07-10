@@ -44,6 +44,7 @@ type Accessary struct {
 	Name      string `json:"name"`
 	ProxyID   string `json:"proxy_id"`
 	Accessory string `json:"accessory"`
+	Dimmerable bool  `json:"dimmerable,omitempty"`
 }
 
 //Envelope means the data transformed from coredata
@@ -127,6 +128,9 @@ func Decode(jsonStr []byte, label string, statusport string) {
 					accessary.Name = projectcommand.Value
 				}
 
+			}else if projectcommand.Name == "dimmerable"{
+				dimmerbool, _ := strconv.ParseBool(projectcommand.Value)
+				accessary.Dimmerable = dimmerbool
 			}
 
 			var command Commands
