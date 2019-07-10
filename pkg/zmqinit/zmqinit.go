@@ -37,6 +37,18 @@ type Reading struct {
 	Value string
 }
 
+type DimmerableLightStatus struct {
+	Id             string                `json:"id"`
+	Name           string                `json:"name"`
+	Service        string                `json:"service"`
+	Characteristic StDimmerLightCharacteristic `json:"characteristic"`
+}
+
+type StDimmerLightCharacteristic struct {
+	Brightness int  `json:"brightness"`
+//	On         bool `json:"on"`
+}
+
 type LightStatus struct {
 	Id             string                `json:"id"`
 	Name           string                `json:"name"`
@@ -45,7 +57,6 @@ type LightStatus struct {
 }
 
 type StLightCharacteristic struct {
-	Brightness int  `json:"brightness"`
 	On         bool `json:"on"`
 }
 
@@ -179,11 +190,7 @@ func getEdgexParams(commandzmq CommandZmq) (edgexParams string, err error) {
 	data := make(map[string]string)
 	if params.(map[string]interface{})["onOrOff"] != nil {
 		onoroff := params.(map[string]interface{})["onOrOff"].(bool)
-		if onoroff {
-			data["brightness"] = "100"
-		} else {
-			data["brightness"] = "0"
-		}
+		data["onoff"] = strconv.FormatBool(onoroff)
 	} else if params.(map[string]interface{})["percent"] != nil {
 		percent := params.(map[string]interface{})["percent"].(float64)
 		data["percent"] = strconv.FormatInt(int64(percent), 10)
@@ -283,32 +290,37 @@ func EventHanler(bd string) (err error) {
 		defaultname := device.Accessarysenders[i].Name
 		defaultid := device.Accessaries[i].ProxyID
 		defaulttype := device.Accessaries[i].Service
-		fmt.Println("defaultname: ",defaultname)
-		fmt.Println("devicename: ",devicename)
 		if devicename == defaultname {
-			var lightstatus LightStatus
+			var dimmerablelightstatus DimmerableLightStatus
 			var curtainstatus CurtainStatus
+			var lightstatus LightStatus
 			for j := range event.Readings {
 				switch event.Readings[j].Name {
 				case "brightness":
-					fmt.Println("in brightness")
-					lightstatus.Characteristic.Brightness, _ = strconv.Atoi(event.Readings[j].Value)
-					if lightstatus.Characteristic.Brightness > 0 {
-						lightstatus.Characteristic.On = true
-					} else {
-						lightstatus.Characteristic.On = false
-					}
-					lightstatus.Id = defaultid
-					lightstatus.Name = defaultname
-					lightstatus.Service = defaulttype
-					status["status"] = lightstatus
-					fmt.Println("in lightstatus",lightstatus)
+					if device.Accessaries[i].Dimmerable == "true"{
+					dimmerablelightstatus.Characteristic.Brightness, _ = strconv.Atoi(event.Readings[j].Value)
+					// if lightstatus.Characteristic.Brightness > 0 {
+					// 	dimmerablelightstatus.Characteristic.On = true
+					// } else {
+					// 	dimmerablelightstatus.Characteristic.On = false
+					// }
+					dimmerablelightstatus.Id = defaultid
+					dimmerablelightstatus.Name = defaultname
+					dimmerablelightstatus.Service = defaulttype
+					status["status"] = dimmerablelightstatus
+				}
 				case "percent":
 					curtainstatus.Characteristic.Percent, _ = strconv.Atoi(event.Readings[j].Value)
 					curtainstatus.Id = defaultid
 					curtainstatus.Name = defaultname
 					curtainstatus.Service = defaulttype
 					status["status"] = curtainstatus
+				case "onoff":
+					lightstatus.Characteristic.On, _ = strconv.ParseBool(event.Readings[j].Value)
+					lightstatus.Id = defaultid
+					lightstatus.Name = defaultname
+					lightstatus.Service = defaulttype
+					status["status"] = lightstatus
 				default:
 					return
 				}
@@ -317,15 +329,18 @@ func EventHanler(bd string) (err error) {
 		}
 	}
 
+
 	data, err := json.MarshalIndent(status, "", " ")
 	if err != nil {
 		return errorHandle.ErrMarshalFail
 	}
-	fmt.Println("send to js ", string(data))
-	fmt.Println("newPublisher: ",newPublisher)
-	if newPublisher != nil{
-		_, err = newPublisher.SendMessage("status", data)
+	if string(data) != "{}"{
+		fmt.Println("send to js ", string(data))
+		if newPublisher != nil{
+			_, err = newPublisher.SendMessage("status", data)
+		}
 	}
+
 			
 
 

@@ -44,7 +44,7 @@ type Accessary struct {
 	Name      string `json:"name"`
 	ProxyID   string `json:"proxy_id"`
 	Accessory string `json:"accessory"`
-	Dimmerable bool  `json:"dimmerable,omitempty"`
+	Dimmerable string  `json:"dimmerable,omitempty"`
 }
 
 //Envelope means the data transformed from coredata
@@ -110,14 +110,8 @@ func Decode(jsonStr []byte, label string, statusport string) {
 				if Accessaries != nil{
 					for _,access := range Accessaries {
 						if access.Name != projectcommand.Value{
-							fmt.Println("in name不相同")
-							fmt.Println(access.Name)
-							fmt.Println(projectcommand.Value)
 							accessary.Name = projectcommand.Value
 						}else{
-							fmt.Println("in name相同")
-							fmt.Println(access.Name)
-							fmt.Println(projectcommand.Value)
 							accessary.Name = fmt.Sprintf("%s(%d)",projectcommand.Value,index)
 							fmt.Println("accessary.Name: ",accessary.Name)
 							index++
@@ -129,8 +123,7 @@ func Decode(jsonStr []byte, label string, statusport string) {
 				}
 
 			}else if projectcommand.Name == "dimmerable"{
-				dimmerbool, _ := strconv.ParseBool(projectcommand.Value)
-				accessary.Dimmerable = dimmerbool
+				accessary.Dimmerable = projectcommand.Value
 			}
 
 			var command Commands
