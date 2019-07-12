@@ -85,7 +85,7 @@ func Decode(jsonStr []byte, label string, statusport string) {
 		log.Println(err)
 		return
 	}
-	index := 0
+	index := 1
 	// for the love of Gopher DO NOT DO THIS
 
 	for _, project := range projects {

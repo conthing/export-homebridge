@@ -19,7 +19,7 @@ func HttpPost(statusport string) {
 	reg := models.Registration{}
 	reg.Name = "RESTXMLClient"
 	reg.Format = "JSON"
-	reg.Filter.ValueDescriptorIDs = []string{"brightness", "percent", "moving"}
+	reg.Filter.ValueDescriptorIDs = []string{"brightness", "percent", "moving","onoff"}
 	reg.Enable = true
 	reg.Destination = "REST_ENDPOINT"
 	reg.Addressable = models.Addressable{Name: "EdgeXTestRESTXML", Protocol: "HTTP", HTTPMethod: "POST",

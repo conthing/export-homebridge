@@ -46,7 +46,7 @@ type DimmerableLightStatus struct {
 
 type StDimmerLightCharacteristic struct {
 	Brightness int  `json:"brightness"`
-//	On         bool `json:"on"`
+	On         bool `json:"on"`
 }
 
 type LightStatus struct {
@@ -156,14 +156,18 @@ func ZmqInit() error {
 					//		case "brightness":
 					var commandid = device.Accessarysenders[i].Commands[n].ID
 					statuscommand := commandform(commandid, deviceid)
+					fmt.Println("statuscommand: ",statuscommand)
 					result, err := httpsender.GetMessage(statuscommand)
 					if err != nil {
 						return err
 					}
-					err = EventHanler(string(result))
-					if err != nil {
-						return err
+					if string(result) != "" {
+						err = EventHanler(string(result))
+						if err != nil {
+							return err
+						}
 					}
+					
 					//			case "percent":
 
 					//			default:
@@ -173,55 +177,60 @@ func ZmqInit() error {
 
 			}
 		} else {
-			params, err := getEdgexParams(commandzmq)
+			params,commandname,err := getEdgexParams(commandzmq)
 			if err != nil {
 				return err
 			}
 			id := commandzmq.ID
-			sendcommand(id, params)
+			sendcommand(id, params,commandname)
 		}
 	}
 
 }
 
-func getEdgexParams(commandzmq CommandZmq) (edgexParams string, err error) {
+func getEdgexParams(commandzmq CommandZmq) (edgexParams string,commandname string, err error) {
 	params := commandzmq.Command.Params
 	fmt.Println("params: ",params)
 	data := make(map[string]string)
 	if params.(map[string]interface{})["onOrOff"] != nil {
 		onoroff := params.(map[string]interface{})["onOrOff"].(bool)
 		data["onoff"] = strconv.FormatBool(onoroff)
+		commandname = "onoff"
 	} else if params.(map[string]interface{})["percent"] != nil {
 		percent := params.(map[string]interface{})["percent"].(float64)
 		data["percent"] = strconv.FormatInt(int64(percent), 10)
+		commandname = "percent"
 	}else if params.(map[string]interface{})["brightness"] != nil {
 		brightness := params.(map[string]interface{})["brightness"].(float64)
 		data["brightness"] = strconv.FormatInt(int64(brightness), 10)
+		commandname = "brightness"
 	}else {
 		fmt.Println("other type")
 	}
 	datajson, err := json.Marshal(data)
 	if err != nil {
-		return "", errorHandle.ErrMarshalFail
+		return "","" ,errorHandle.ErrMarshalFail
 	}
 	edgexParams = string(datajson)
-	return edgexParams, nil
+	return edgexParams,commandname, nil
 }
 
-func sendcommand(proxyid string, params string) {
+func sendcommand(proxyid string, params string,commandname string) {
 	for j := range device.Accessarysenders {
 		deviceid := device.Accessarysenders[j].ID
 		if deviceid == proxyid {
 			for k := range device.Accessarysenders[j].Commands {
 				switch device.Accessarysenders[j].Commands[k].Name {
 				case "brightness":
-					commandid := device.Accessarysenders[j].Commands[k].ID
-					controlcommand := commandform(commandid, deviceid)
-					result, err := httpsender.Put(controlcommand, params)
-					if err != nil {
-						return
+					if commandname == "brightness"{
+						commandid := device.Accessarysenders[j].Commands[k].ID
+						controlcommand := commandform(commandid, deviceid)
+						result, err := httpsender.Put(controlcommand, params)
+						if err != nil {
+							return
+						}
+						fmt.Println("put result", string(result))
 					}
-					fmt.Println("put result", string(result))
 				case "percent":
 					commandid := device.Accessarysenders[j].Commands[k].ID
 					controlcommand := commandform(commandid, deviceid)
@@ -230,6 +239,16 @@ func sendcommand(proxyid string, params string) {
 						return
 					}
 					fmt.Println("put result", string(result))
+				case "onoff":
+					if commandname == "onoff"{
+						commandid := device.Accessarysenders[j].Commands[k].ID
+						controlcommand := commandform(commandid, deviceid)
+						result, err := httpsender.Put(controlcommand, params)
+						if err != nil {
+							return
+						}
+						fmt.Println("put result", string(result))
+					}		
 				default:
 					fmt.Println("in default")
 				}
@@ -299,11 +318,11 @@ func EventHanler(bd string) (err error) {
 				case "brightness":
 					if device.Accessaries[i].Dimmerable == "true"{
 					dimmerablelightstatus.Characteristic.Brightness, _ = strconv.Atoi(event.Readings[j].Value)
-					// if lightstatus.Characteristic.Brightness > 0 {
-					// 	dimmerablelightstatus.Characteristic.On = true
-					// } else {
-					// 	dimmerablelightstatus.Characteristic.On = false
-					// }
+					if dimmerablelightstatus.Characteristic.Brightness > 0 {
+						dimmerablelightstatus.Characteristic.On = true
+					} else {
+						dimmerablelightstatus.Characteristic.On = false
+					}
 					dimmerablelightstatus.Id = defaultid
 					dimmerablelightstatus.Name = defaultname
 					dimmerablelightstatus.Service = defaulttype
@@ -325,7 +344,6 @@ func EventHanler(bd string) (err error) {
 					return
 				}
 			}
-
 		}
 	}
 
