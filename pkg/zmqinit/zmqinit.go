@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"strings"
 
+	"github.com/conthing/export-homebridge"
 	"github.com/conthing/export-homebridge/pkg/device"
 	"github.com/conthing/export-homebridge/pkg/errorHandle"
 	httpsender "github.com/conthing/export-homebridge/pkg/http"
@@ -182,7 +184,7 @@ func ZmqInit() error {
 				return err
 			}
 			id := commandzmq.ID
-			sendcommand(id, params,commandname)
+			go sendcommand(id, params,commandname)
 		}
 	}
 
@@ -372,6 +374,7 @@ func LoadRestRoutes() http.Handler {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/rest", commandHandler).Methods(http.MethodGet, http.MethodPost)
+	r.HandleFunc("/api/v1/version", versionHandler).Methods(http.MethodGet)
 	r.HandleFunc("/api/v1/reboot", rebootHandler).Methods(http.MethodPost)
 	r.HandleFunc("/api/v1/homebridge/qrcode", qrcodeHandler).Methods(http.MethodGet)
 
@@ -382,6 +385,13 @@ func qrcodeHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Request", r)
 	w.Header().Set("Content-Type", "text/plain")
 	pincode := device.Pincode
+	if pincode==""{
+		fmt.Println("ErrPincodeNil")
+		_, err := w.Write([]byte("ErrPincodeNil")) //多个homebridge的数据再组
+		if err != nil {
+			return
+		}
+	}
 	var data map[string]string = map[string]string{}
 	var datasend []map[string]string
 	data["pincode"] = pincode
@@ -396,6 +406,22 @@ func qrcodeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+
+func versionHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	version := exporthomebridge.Version
+	currentTime:=exporthomebridge.BuildTime
+	fmt.Println("version",version)
+	fmt.Println("currentTime",currentTime)
+	datastring := strings.Join([]string{version, currentTime}, " ")
+	_, err := w.Write([]byte(datastring)) //多个homebridge的数据再组
+	if err != nil {
+		return
+	}
+}
+
+
 
 func rebootHandler(w http.ResponseWriter, r *http.Request) {
 
