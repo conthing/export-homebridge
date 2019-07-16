@@ -182,7 +182,7 @@ func ZmqInit() error {
 				return err
 			}
 			id := commandzmq.ID
-			sendcommand(id, params,commandname)
+			go sendcommand(id, params,commandname)
 		}
 	}
 
