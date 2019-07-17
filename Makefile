@@ -11,9 +11,8 @@ BUILD_TIME   := $(shell date "+%F %T")
 
 BUILD_NAME      := github.com/conthing
 
-GOFLAGS=-ldflags "-X ${BUILD_NAME}/export-homebridge.Version=$(VERSION)\
- -X '${BUILD_NAME}/export-homebridge.BuildTime=${BUILD_TIME}'\
-    -X ${BUILD_NAME}/export-homebridge.BuildName=${BUILD_NAME}"
+GOFLAGS=-ldflags "-X ${BUILD_NAME}/utils/common.Version=$(VERSION)\
+ -X '${BUILD_NAME}/utils/common.BuildTime=${BUILD_TIME}'"
 
 GIT_SHA=$(shell git rev-parse HEAD)
 
@@ -21,6 +20,7 @@ build: $(MICROSERVICES)
 
 cmd/export-homebridge/export-homebridge:
 	$(GO) build $(GOFLAGS) -o $@ ./cmd/export-homebridge
+
 
 test:
 	$(GO) test ./... -cover

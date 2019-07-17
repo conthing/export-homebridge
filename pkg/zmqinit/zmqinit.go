@@ -9,7 +9,7 @@ import (
 	"time"
 	"strings"
 
-	"github.com/conthing/export-homebridge"
+	"github.com/conthing/utils/common"
 	"github.com/conthing/export-homebridge/pkg/device"
 	"github.com/conthing/export-homebridge/pkg/errorHandle"
 	httpsender "github.com/conthing/export-homebridge/pkg/http"
@@ -410,10 +410,10 @@ func qrcodeHandler(w http.ResponseWriter, r *http.Request) {
 
 func versionHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
-	version := exporthomebridge.Version
-	currentTime:=exporthomebridge.BuildTime
+	version := common.Version
+	currentTime:=common.BuildTime
 	fmt.Println("version",version)
-	fmt.Println("currentTime",currentTime)
+	fmt.Println("Time",currentTime)
 	datastring := strings.Join([]string{version, currentTime}, " ")
 	_, err := w.Write([]byte(datastring)) //多个homebridge的数据再组
 	if err != nil {
