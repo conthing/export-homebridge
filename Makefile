@@ -2,8 +2,11 @@
 
 GO=PKG_CONFIG_PATH=/usr/local/zeromq-4.2.2/arm/lib/pkgconfig GOARCH=arm CC=arm-linux-gnueabihf-gcc CGO_ENABLED=1 CGO_CFLAGS="-g -O2 -I/usr/local/zeromq-4.2.2/arm/include" CGO_LDFLAGS="-g -O2 -L/usr/local/zeromq-4.2.2/arm/lib -L/usr/arm-linux-gnueabihf/lib -Wl,-rpath-link /usr/local/zeromq-4.2.2/arm/lib -Wl,-rpath-link /usr/arm-linux-gnueabihf/lib" go
 
+GOAMD64=PKG_CONFIG_PATH=/usr/local/zeromq-4.2.2/amd64/lib/pkgconfig GOOS=linux GOARCH=amd64 go
+
 MICROSERVICES=cmd/export-homebridge/export-homebridge
-.PHONY: $(MICROSERVICES)
+
+MICROSERVICESAMD64=cmd/export-homebridge/amd64/export-homebridge
 
 VERSION=$(shell cat ./VERSION)
 
@@ -16,14 +19,28 @@ GOFLAGS=-ldflags "-X ${BUILD_NAME}/utils/common.Version=$(VERSION)\
 
 GIT_SHA=$(shell git rev-parse HEAD)
 
-build: $(MICROSERVICES)
+.PHONY: $(MICROSERVICES)
+
+build_arm: $(MICROSERVICES)
 
 cmd/export-homebridge/export-homebridge:
 	$(GO) build $(GOFLAGS) -o $@ ./cmd/export-homebridge
-
 
 test:
 	$(GO) test ./... -cover
 
 clean:
-	rm -f $(MICROSERVICES)
+	rm -f cmd/export-homebridge/export-homebridge
+
+.PHONY: $(MICROSERVICESAMD64)
+
+build_amd64: $(MICROSERVICESAMD64)
+
+cmd/export-homebridge/amd64/export-homebridge:
+	$(GOAMD64) build $(GOFLAGS) -o $@ ./cmd/export-homebridge
+
+test_amd64:
+	$(GOAMD64) test ./... -cover
+
+clean_amd64:
+	rm -f cmd/export-homebridge/amd64/export-homebridge
