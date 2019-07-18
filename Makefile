@@ -43,4 +43,4 @@ test_amd64:
 	$(GOAMD64) test ./... -cover
 
 clean_amd64:
-	rm -f cmd/export-homebridge/amd64/export-homebridge
+	rm -f $(MICROSERVICESAMD64)
