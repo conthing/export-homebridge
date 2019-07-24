@@ -12,9 +12,10 @@ import (
 	"github.com/conthing/export-homebridge/pkg/device"
 	"github.com/conthing/export-homebridge/pkg/errorHandle"
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
+	jsoniter "github.com/json-iterator/go"
 )
 
-func HttpPost(statusport string) {
+func HttpPost(statusport string) error {
 
 	reg := models.Registration{}
 	reg.Name = "RESTXMLClient"
@@ -43,7 +44,7 @@ func HttpPost(statusport string) {
 	// registration["addressable"] = addressable
 	data, err := json.Marshal(reg)
 	if err != nil {
-		return
+		return errorHandle.ErrMarshalFail
 	}
 
 	//str := "{\"origin\":1471806386919,\"name\":\"RESTXMLClient\",\"addressable\":{\"origin\":1471806386919,\"name\":\"EdgeXTestRESTXML\",\"protocol\":\"HTTP\",\"method\": \"POST\",\"address\":\"localhost\",\"port\":8111,\"path\":\"/rest\"},\"format\":\"JSON\",\"enable\":true,\"destination\":\"REST_ENDPOINT\"}"
@@ -54,7 +55,7 @@ func HttpPost(statusport string) {
 		bytes.NewBuffer(jsonstr))
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 
 	defer func() {
@@ -66,8 +67,7 @@ func HttpPost(statusport string) {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		// handle error
-		log.Println(err)
-		return
+		return err
 	}
 
 	log.Println(string(body))
@@ -75,15 +75,24 @@ func HttpPost(statusport string) {
 	labels := []string{"Light","Curtain"}
 	for _, label := range labels {
 		projectUrl := "http://localhost:52030/api/v1/project/" + label
-		var projectlist, _ = GetMessage(projectUrl)
-		device.Decode(projectlist, label, statusport)
+		var projectlist, err = GetMessage(projectUrl)
+		if jsoniter.Get(projectlist).Size() == 0 {
+			return errorHandle.ErrSizeNil
+		}
+		if err != nil{
+			return err
+		} 
+		err = device.Decode(projectlist, label, statusport)
+		if err != nil{
+			return err
+		} 
 	}
+	return nil
 }
 
 func GetMessage(msg string) (body []byte, err error) {
 	resp, err := http.Get(msg)
 	if err != nil {
-		log.Println(err)
 		return nil, errorHandle.ErrGetFail
 	}
 

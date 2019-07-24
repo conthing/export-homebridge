@@ -88,10 +88,7 @@ func InitZmq(statusport string) error {
 	}
 	statuspubport = statusport
 	fmt.Println("zmq bind to ", statusport)
-	err = newPublisher.Bind(statusport)
-	{
-		return errorHandle.ErrBindFail
-	}
+	_ = newPublisher.Bind(statusport)
 	time.Sleep(200 * time.Millisecond)
 	return nil
 }
@@ -444,6 +441,6 @@ func rebootHandler(w http.ResponseWriter, r *http.Request) {
 	for _, label := range labels {
 		projectUrl := "http://localhost:52030/api/v1/project/" + label
 		var projectlist, _ = httpsender.GetMessage(projectUrl)
-		device.Decode(projectlist, label, statuspubport)
+		_ = device.Decode(projectlist, label, statuspubport)
 	}
 }

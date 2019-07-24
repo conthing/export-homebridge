@@ -52,15 +52,34 @@ type Status struct {
 
 var cfg  = Config{}
 
+func boot(_ interface{}) (needRetry bool, err error) {
+
+	err = httpsender.HttpPost(cfg.HTTP.Statusport)
+	if err!=nil{
+		return true,err
+	}
+
+	err = zmqinit.InitZmq(cfg.HTTP.Statusport)
+	if err!=nil{
+		return true,err
+	}
+
+	go zmqinit.ZmqInit()
+
+
+	return false, nil
+}
+
+
 func main() {
 	start := time.Now()
-	var cfgfile string
 
+	var cfgfile string
 	flag.StringVar(&cfgfile, "config", "configuration.toml", "Specify a profile other than default.")
 	flag.StringVar(&cfgfile, "c", "configuration.toml", "Specify a profile other than default.")
 	flag.Parse()
 
-	common.InitLogger(&common.LoggerConfig{Level: "DEBUG", SkipCaller: true})
+		common.InitLogger(&common.LoggerConfig{Level: "DEBUG", SkipCaller: true})
 
 	err := common.LoadConfig(cfgfile, &cfg)
 	if err != nil {
@@ -68,15 +87,9 @@ func main() {
 		return
 	}
 
-
-	fmt.Println("statusport: ",cfg.HTTP.Statusport)
-	fmt.Println("port: ",cfg.HTTP.Port)
-
-	httpsender.HttpPost(cfg.HTTP.Statusport)
-
-	_ = zmqinit.InitZmq(cfg.HTTP.Statusport)
-
-	go zmqinit.ZmqInit()
+	if common.Bootstrap(boot, nil, 30000, 2000) != nil {
+		return
+	}
 
 	errs := make(chan error, 3)
 	listenForInterrupt(errs)
