@@ -87,7 +87,7 @@ func main() {
 		return
 	}
 
-	if common.Bootstrap(boot, nil, 30000, 2000) != nil {
+	if common.Bootstrap(boot, nil, 60000, 2000) != nil {
 		return
 	}
 
