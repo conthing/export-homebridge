@@ -72,21 +72,27 @@ func HttpPost(statusport string) error {
 
 	log.Println(string(body))
 
-	labels := []string{"Light","Curtain"}
-	for _, label := range labels {
-		projectUrl := "http://localhost:52030/api/v1/project/" + label
-		var projectlist, err = GetMessage(projectUrl)
-		if jsoniter.Get(projectlist).Size() == 0 {
+
+
+		lightprojectUrl := "http://localhost:52030/api/v1/project/Light"
+		lightprojectlist, err := GetMessage(lightprojectUrl)
+		if err != nil{
+			return err
+		} 
+		curtainprojectUrl := "http://localhost:52030/api/v1/project/Curtain"
+		curtainprojectlist, err := GetMessage(curtainprojectUrl)
+		if err != nil{
+			return err
+		} 
+
+		if jsoniter.Get(lightprojectlist).Size() == 0 && jsoniter.Get(curtainprojectlist).Size() == 0 {
 			return errorHandle.ErrSizeNil
 		}
+		err = device.Decode(lightprojectlist, "light", statusport)
+		err = device.Decode(curtainprojectlist, "curtain", statusport)
 		if err != nil{
 			return err
 		} 
-		err = device.Decode(projectlist, label, statusport)
-		if err != nil{
-			return err
-		} 
-	}
 	return nil
 }
 
