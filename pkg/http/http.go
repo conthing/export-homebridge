@@ -88,8 +88,8 @@ func HttpPost(statusport string) error {
 		if jsoniter.Get(lightprojectlist).Size() == 0 && jsoniter.Get(curtainprojectlist).Size() == 0 {
 			return errorHandle.ErrSizeNil
 		}
-		err = device.Decode(lightprojectlist, "light", statusport)
-		err = device.Decode(curtainprojectlist, "curtain", statusport)
+		err = device.Decode(lightprojectlist, "Light", statusport)
+		err = device.Decode(curtainprojectlist, "Curtain", statusport)
 		if err != nil{
 			return err
 		} 
