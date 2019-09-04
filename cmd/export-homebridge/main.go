@@ -13,8 +13,8 @@ import (
 
 	httpsender "github.com/conthing/export-homebridge/pkg/http"
 	zmqinit "github.com/conthing/export-homebridge/pkg/zmqinit"
-	"github.com/gorilla/context"
 	"github.com/conthing/utils/common"
+	"github.com/gorilla/context"
 	serial "github.com/tarm/goserial"
 )
 
@@ -27,7 +27,7 @@ type Config struct {
 
 //HTTPConfig is the port from config
 type HTTPConfig struct {
-	Port int `json:"port"`
+	Port       int    `json:"port"`
 	Statusport string `json:"statusport"`
 }
 
@@ -50,26 +50,24 @@ type Status struct {
 	Characteristic map[string]interface{}
 }
 
-var cfg  = Config{}
+var cfg = Config{}
 
 func boot(_ interface{}) (needRetry bool, err error) {
 
 	err = httpsender.HttpPost(cfg.HTTP.Statusport)
-	if err!=nil{
-		return true,err
+	if err != nil {
+		return true, err
 	}
 
 	err = zmqinit.InitZmq(cfg.HTTP.Statusport)
-	if err!=nil{
-		return true,err
+	if err != nil {
+		return true, err
 	}
 
-	go zmqinit.ZmqInit()
-
+	//go zmqinit.ZmqInit()   //最下方有zmqinit.ZmqInit()函数的调用，这里是多余的注释掉
 
 	return false, nil
 }
-
 
 func main() {
 	start := time.Now()
@@ -79,7 +77,7 @@ func main() {
 	flag.StringVar(&cfgfile, "c", "configuration.toml", "Specify a profile other than default.")
 	flag.Parse()
 
-		common.InitLogger(&common.LoggerConfig{Level: "DEBUG", SkipCaller: true})
+	common.InitLogger(&common.LoggerConfig{Level: "DEBUG", SkipCaller: true})
 
 	err := common.LoadConfig(cfgfile, &cfg)
 	if err != nil {
@@ -95,6 +93,8 @@ func main() {
 	listenForInterrupt(errs)
 
 	startHTTPServer(errs, cfg.HTTP.Port)
+
+	startZMQReceive(errs)   //startZMQReceive函数的调用
 
 	// Time it took to start service
 	log.Printf("HTTP server listening on port %d, started in: %s", cfg.HTTP.Port, time.Since(start).String())
@@ -118,5 +118,11 @@ func listenForInterrupt(errChan chan error) {
 		c := make(chan os.Signal)
 		signal.Notify(c, syscall.SIGINT)
 		errChan <- fmt.Errorf("%s", <-c)
+	}()
+}
+//添加原因是防止zmqinit.ZmqInit()函数因为数据错误造成export-homebridge启不来而健康检查又检查不到
+func startZMQReceive(errChan chan error) {
+	go func() {
+		errChan <- zmqinit.ZmqInit()
 	}()
 }
