@@ -12,14 +12,15 @@ import (
 	"github.com/conthing/export-homebridge/pkg/device"
 	"github.com/conthing/export-homebridge/pkg/errorHandle"
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
+	jsoniter "github.com/json-iterator/go"
 )
 
-func HttpPost(statusport string) {
+func HttpPost(statusport string) error {
 
 	reg := models.Registration{}
 	reg.Name = "RESTXMLClient"
 	reg.Format = "JSON"
-	reg.Filter.ValueDescriptorIDs = []string{"brightness", "percent", "moving"}
+	reg.Filter.ValueDescriptorIDs = []string{"brightness", "percent", "moving","onoff"}
 	reg.Enable = true
 	reg.Destination = "REST_ENDPOINT"
 	reg.Addressable = models.Addressable{Name: "EdgeXTestRESTXML", Protocol: "HTTP", HTTPMethod: "POST",
@@ -43,7 +44,7 @@ func HttpPost(statusport string) {
 	// registration["addressable"] = addressable
 	data, err := json.Marshal(reg)
 	if err != nil {
-		return
+		return errorHandle.ErrMarshalFail
 	}
 
 	//str := "{\"origin\":1471806386919,\"name\":\"RESTXMLClient\",\"addressable\":{\"origin\":1471806386919,\"name\":\"EdgeXTestRESTXML\",\"protocol\":\"HTTP\",\"method\": \"POST\",\"address\":\"localhost\",\"port\":8111,\"path\":\"/rest\"},\"format\":\"JSON\",\"enable\":true,\"destination\":\"REST_ENDPOINT\"}"
@@ -54,7 +55,7 @@ func HttpPost(statusport string) {
 		bytes.NewBuffer(jsonstr))
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 
 	defer func() {
@@ -66,24 +67,38 @@ func HttpPost(statusport string) {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		// handle error
-		log.Println(err)
-		return
+		return err
 	}
 
 	log.Println(string(body))
 
-	labels := []string{"Light", "Keypad"}
-	for _, label := range labels {
-		projectUrl := "http://localhost:52030/api/v1/project/" + label
-		var projectlist, _ = GetMessage(projectUrl)
-		device.Decode(projectlist, label, statusport)
-	}
+
+
+		lightprojectUrl := "http://localhost:52030/api/v1/project/Light"
+		lightprojectlist, err := GetMessage(lightprojectUrl)
+		if err != nil{
+			return err
+		} 
+		curtainprojectUrl := "http://localhost:52030/api/v1/project/Curtain"
+		curtainprojectlist, err := GetMessage(curtainprojectUrl)
+		if err != nil{
+			return err
+		} 
+
+		if jsoniter.Get(lightprojectlist).Size() == 0 && jsoniter.Get(curtainprojectlist).Size() == 0 {
+			return errorHandle.ErrSizeNil
+		}
+		err = device.Decode(lightprojectlist, "Light", statusport)
+		err = device.Decode(curtainprojectlist, "Curtain", statusport)
+		if err != nil{
+			return err
+		} 
+	return nil
 }
 
 func GetMessage(msg string) (body []byte, err error) {
 	resp, err := http.Get(msg)
 	if err != nil {
-		log.Println(err)
 		return nil, errorHandle.ErrGetFail
 	}
 
