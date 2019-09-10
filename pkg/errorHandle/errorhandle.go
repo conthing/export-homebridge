@@ -2,6 +2,7 @@ package errorHandle
 
 import "errors"
 
+//todo 这些不是errorhandler，不需要单独一个package
 var ErrGetFail = errors.New("ErrGetFail")
 var ErrReadFail = errors.New("ErrReadFail")
 var ErrRequestFail = errors.New("ErrRequestFail")

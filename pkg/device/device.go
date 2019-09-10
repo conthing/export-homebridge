@@ -3,12 +3,13 @@ package device
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/conthing/export-homebridge/pkg/errorHandle"
 	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/conthing/export-homebridge/pkg/errorHandle"
 )
 
 //var ErrUnknownType = errors.New("ErrUnknownType")
@@ -39,11 +40,11 @@ type Platform struct {
 }
 
 type Accessary struct {
-	Service   string `json:"service"`
-	Name      string `json:"name"`
-	ProxyID   string `json:"proxy_id"`
-	Accessory string `json:"accessory"`
-	Dimmerable string  `json:"dimmerable,omitempty"`
+	Service    string `json:"service"`
+	Name       string `json:"name"`
+	ProxyID    string `json:"proxy_id"`
+	Accessory  string `json:"accessory"`
+	Dimmerable string `json:"dimmerable,omitempty"`
 }
 
 //Envelope means the data transformed from coredata
@@ -75,6 +76,7 @@ var Accessaries []Accessary
 var Accessarysenders []Accessarysender
 var Pincode string
 
+//todo 函数体中缺乏注释，原则是代码不能自解释，就要加注释
 func Decode(jsonStr []byte, label string, statusport string) error {
 
 	var projects []Project
@@ -92,7 +94,7 @@ func Decode(jsonStr []byte, label string, statusport string) error {
 		accessary.ProxyID = project.Id
 		accessary.Accessory = "Control4"
 		commands := accessarysender.Commands
-		
+
 		switch label {
 		case "Light":
 			accessary.Service = "Lightbulb"
@@ -105,22 +107,22 @@ func Decode(jsonStr []byte, label string, statusport string) error {
 
 		for _, projectcommand := range project.Commands {
 			if projectcommand.Name == "alias" {
-				if Accessaries != nil{
-					for _,access := range Accessaries {
-						if access.Name != projectcommand.Value{
+				if Accessaries != nil {
+					for _, access := range Accessaries {
+						if access.Name != projectcommand.Value {
 							accessary.Name = projectcommand.Value
-						}else{
-							accessary.Name = fmt.Sprintf("%s(%d)",projectcommand.Value,index)
-							fmt.Println("accessary.Name: ",accessary.Name)
+						} else {
+							accessary.Name = fmt.Sprintf("%s(%d)", projectcommand.Value, index)
+							fmt.Println("accessary.Name: ", accessary.Name)
 							index++
 							break
 						}
 					}
-				}else{
+				} else {
 					accessary.Name = projectcommand.Value
 				}
 
-			}else if projectcommand.Name == "dimmerable"{
+			} else if projectcommand.Name == "dimmerable" {
 				accessary.Dimmerable = projectcommand.Value
 			}
 
@@ -142,7 +144,7 @@ func Decode(jsonStr []byte, label string, statusport string) error {
 		return errorHandle.ErrCreateFail
 	}
 	b, err := json.MarshalIndent(configdata, "", " ") //变成json字符串
-	if err !=nil{
+	if err != nil {
 		return errorHandle.ErrMarshalFail
 	}
 
@@ -200,6 +202,7 @@ func createConfigData(accessaries []Accessary, statusport string) (configdata Au
 	return
 }
 
+// todo utils项目中有获取mac的接口，这个写法有问题
 func mac() (mac string) {
 	// 获取本机的MAC地址
 	interfaces, err := net.Interfaces()
