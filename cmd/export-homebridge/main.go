@@ -1,3 +1,7 @@
+//todo 对这个微服务的功能介绍
+//todo 把现在sysmgmt的homebridge重启和清空数据文件两个功能搬过来
+//todo 单元测试
+
 package main
 
 import (
@@ -94,7 +98,7 @@ func main() {
 
 	startHTTPServer(errs, cfg.HTTP.Port)
 
-	startZMQReceive(errs)   //startZMQReceive函数的调用
+	startZMQReceive(errs) //startZMQReceive函数的调用
 
 	// Time it took to start service
 	log.Printf("HTTP server listening on port %d, started in: %s", cfg.HTTP.Port, time.Since(start).String())
@@ -120,6 +124,7 @@ func listenForInterrupt(errChan chan error) {
 		errChan <- fmt.Errorf("%s", <-c)
 	}()
 }
+
 //添加原因是防止zmqinit.ZmqInit()函数因为数据错误造成export-homebridge启不来而健康检查又检查不到
 func startZMQReceive(errChan chan error) {
 	go func() {

@@ -6,13 +6,13 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"time"
 	"strings"
+	"time"
 
-	"github.com/conthing/utils/common"
 	"github.com/conthing/export-homebridge/pkg/device"
 	"github.com/conthing/export-homebridge/pkg/errorHandle"
 	httpsender "github.com/conthing/export-homebridge/pkg/http"
+	"github.com/conthing/utils/common"
 	"github.com/gorilla/mux"
 	zmq "github.com/pebbe/zmq4"
 )
@@ -40,9 +40,9 @@ type Reading struct {
 }
 
 type DimmerableLightStatus struct {
-	Id             string                `json:"id"`
-	Name           string                `json:"name"`
-	Service        string                `json:"service"`
+	Id             string                      `json:"id"`
+	Name           string                      `json:"name"`
+	Service        string                      `json:"service"`
 	Characteristic StDimmerLightCharacteristic `json:"characteristic"`
 }
 
@@ -59,7 +59,7 @@ type LightStatus struct {
 }
 
 type StLightCharacteristic struct {
-	On         bool `json:"on"`
+	On bool `json:"on"`
 }
 
 type CurtainStatus struct {
@@ -78,7 +78,6 @@ var newPublisher *zmq.Socket
 var statuspubport string
 
 //var statusReq *zmq.Socket
-
 
 func InitZmq(statusport string) error {
 	var err error
@@ -117,7 +116,6 @@ func ZmqInit() error {
 		return errorHandle.ErrConnectFail
 	}
 
-
 	var commandzmq CommandZmq
 
 	for {
@@ -155,7 +153,7 @@ func ZmqInit() error {
 					//		case "brightness":
 					var commandid = device.Accessarysenders[i].Commands[n].ID
 					statuscommand := commandform(commandid, deviceid)
-					fmt.Println("statuscommand: ",statuscommand)
+					fmt.Println("statuscommand: ", statuscommand)
 					result, err := httpsender.GetMessage(statuscommand)
 					if err != nil {
 						return err
@@ -166,7 +164,7 @@ func ZmqInit() error {
 							return err
 						}
 					}
-					
+
 					//			case "percent":
 
 					//			default:
@@ -176,20 +174,20 @@ func ZmqInit() error {
 
 			}
 		} else {
-			params,commandname,err := getEdgexParams(commandzmq)
+			params, commandname, err := getEdgexParams(commandzmq)
 			if err != nil {
 				return err
 			}
 			id := commandzmq.ID
-			go sendcommand(id, params,commandname)
+			go sendcommand(id, params, commandname)
 		}
 	}
 
 }
 
-func getEdgexParams(commandzmq CommandZmq) (edgexParams string,commandname string, err error) {
+func getEdgexParams(commandzmq CommandZmq) (edgexParams string, commandname string, err error) {
 	params := commandzmq.Command.Params
-	fmt.Println("params: ",params)
+	fmt.Println("params: ", params)
 	data := make(map[string]string)
 	if params.(map[string]interface{})["onOrOff"] != nil {
 		onoroff := params.(map[string]interface{})["onOrOff"].(bool)
@@ -199,29 +197,29 @@ func getEdgexParams(commandzmq CommandZmq) (edgexParams string,commandname strin
 		percent := params.(map[string]interface{})["percent"].(float64)
 		data["percent"] = strconv.FormatInt(int64(percent), 10)
 		commandname = "percent"
-	}else if params.(map[string]interface{})["brightness"] != nil {
+	} else if params.(map[string]interface{})["brightness"] != nil {
 		brightness := params.(map[string]interface{})["brightness"].(float64)
 		data["brightness"] = strconv.FormatInt(int64(brightness), 10)
 		commandname = "brightness"
-	}else {
+	} else {
 		fmt.Println("other type")
 	}
 	datajson, err := json.Marshal(data)
 	if err != nil {
-		return "","" ,errorHandle.ErrMarshalFail
+		return "", "", errorHandle.ErrMarshalFail
 	}
 	edgexParams = string(datajson)
-	return edgexParams,commandname, nil
+	return edgexParams, commandname, nil
 }
 
-func sendcommand(proxyid string, params string,commandname string) {
+func sendcommand(proxyid string, params string, commandname string) {
 	for j := range device.Accessarysenders {
 		deviceid := device.Accessarysenders[j].ID
 		if deviceid == proxyid {
 			for k := range device.Accessarysenders[j].Commands {
 				switch device.Accessarysenders[j].Commands[k].Name {
 				case "brightness":
-					if commandname == "brightness"{
+					if commandname == "brightness" {
 						commandid := device.Accessarysenders[j].Commands[k].ID
 						controlcommand := commandform(commandid, deviceid)
 						result, err := httpsender.Put(controlcommand, params)
@@ -239,7 +237,7 @@ func sendcommand(proxyid string, params string,commandname string) {
 					}
 					fmt.Println("put result", string(result))
 				case "onoff":
-					if commandname == "onoff"{
+					if commandname == "onoff" {
 						commandid := device.Accessarysenders[j].Commands[k].ID
 						controlcommand := commandform(commandid, deviceid)
 						result, err := httpsender.Put(controlcommand, params)
@@ -247,7 +245,7 @@ func sendcommand(proxyid string, params string,commandname string) {
 							return
 						}
 						fmt.Println("put result", string(result))
-					}		
+					}
 				default:
 					fmt.Println("in default")
 				}
@@ -270,8 +268,8 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}()
-	buf := make([]byte, 1024)  // 1024为缓存大小，即每次读出的最大数据
-	n, _ := r.Body.Read(buf) // 为这次读出的数据大小
+	buf := make([]byte, 1024) // 1024为缓存大小，即每次读出的最大数据
+	n, _ := r.Body.Read(buf)  // 为这次读出的数据大小
 	log.Print("n: ", n)
 	// if err != nil {
 	// 	log.Print(err)
@@ -281,14 +279,11 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 	bd = string(buf[:n])
 	log.Print("222", bd)
 
-
-
-
 	err := EventHanler(bd)
 	if err != nil {
 		return
 	}
-	
+
 	//4.对收到的event进行处理，然后发给js   status
 }
 
@@ -296,7 +291,7 @@ func EventHanler(bd string) (err error) {
 	var event Event
 	var status map[string]interface{}
 	status = make(map[string]interface{})
-	fmt.Println("收到的event： ",bd)
+	fmt.Println("收到的event： ", bd)
 	bytestr := []byte(bd)
 	err = json.Unmarshal([]byte(bytestr), &event)
 	if err != nil {
@@ -315,18 +310,18 @@ func EventHanler(bd string) (err error) {
 			for j := range event.Readings {
 				switch event.Readings[j].Name {
 				case "brightness":
-					if device.Accessaries[i].Dimmerable == "true"{
-					dimmerablelightstatus.Characteristic.Brightness, _ = strconv.Atoi(event.Readings[j].Value)
-					if dimmerablelightstatus.Characteristic.Brightness > 0 {
-						dimmerablelightstatus.Characteristic.On = true
-					} else {
-						dimmerablelightstatus.Characteristic.On = false
+					if device.Accessaries[i].Dimmerable == "true" {
+						dimmerablelightstatus.Characteristic.Brightness, _ = strconv.Atoi(event.Readings[j].Value)
+						if dimmerablelightstatus.Characteristic.Brightness > 0 {
+							dimmerablelightstatus.Characteristic.On = true
+						} else {
+							dimmerablelightstatus.Characteristic.On = false
+						}
+						dimmerablelightstatus.Id = defaultid
+						dimmerablelightstatus.Name = defaultname
+						dimmerablelightstatus.Service = defaulttype
+						status["status"] = dimmerablelightstatus
 					}
-					dimmerablelightstatus.Id = defaultid
-					dimmerablelightstatus.Name = defaultname
-					dimmerablelightstatus.Service = defaulttype
-					status["status"] = dimmerablelightstatus
-				}
 				case "percent":
 					curtainstatus.Characteristic.Percent, _ = strconv.Atoi(event.Readings[j].Value)
 					curtainstatus.Id = defaultid
@@ -346,27 +341,22 @@ func EventHanler(bd string) (err error) {
 		}
 	}
 
-
 	data, err := json.MarshalIndent(status, "", " ")
 	if err != nil {
 		return errorHandle.ErrMarshalFail
 	}
-	if string(data) != "{}"{
+	if string(data) != "{}" {
 		fmt.Println("send to js ", string(data))
-		if newPublisher != nil{
+		if newPublisher != nil {
 			_, err = newPublisher.SendMessage("status", data)
 		}
 	}
-
-			
-
-
-	
 
 	return
 }
 
 //LoadRestRoutes 定义REST资源
+//todo LoadRestRoutes最好单独放到一个rest.go
 func LoadRestRoutes() http.Handler {
 	r := mux.NewRouter()
 
@@ -375,14 +365,21 @@ func LoadRestRoutes() http.Handler {
 	r.HandleFunc("/api/v1/reboot", rebootHandler).Methods(http.MethodPost)
 	r.HandleFunc("/api/v1/homebridge/qrcode", qrcodeHandler).Methods(http.MethodGet)
 
+	r.HandleFunc("/api/v1/ping", pingHandler).Methods(http.MethodGet)
 	return r
+}
+
+// Respond with PINGRESPONSE to see if the service is alive
+func pingHandler(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte("pong"))
 }
 
 func qrcodeHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Request", r)
 	w.Header().Set("Content-Type", "text/plain")
 	pincode := device.Pincode
-	if pincode==""{
+	if pincode == "" {
 		fmt.Println("ErrPincodeNil")
 		_, err := w.Write([]byte("ErrPincodeNil")) //多个homebridge的数据再组
 		if err != nil {
@@ -404,21 +401,18 @@ func qrcodeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 func versionHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	version := common.Version
-	currentTime:=common.BuildTime
-	fmt.Println("version",version)
-	fmt.Println("Time",currentTime)
+	currentTime := common.BuildTime
+	fmt.Println("version", version)
+	fmt.Println("Time", currentTime)
 	datastring := strings.Join([]string{version, currentTime}, " ")
 	_, err := w.Write([]byte(datastring)) //多个homebridge的数据再组
 	if err != nil {
 		return
 	}
 }
-
-
 
 func rebootHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -428,8 +422,8 @@ func rebootHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}()
-	buf := make([]byte, 1024)  // 1024为缓存大小，即每次读出的最大数据
-	n, _ := r.Body.Read(buf) // 为这次读出的数据大小
+	buf := make([]byte, 1024) // 1024为缓存大小，即每次读出的最大数据
+	n, _ := r.Body.Read(buf)  // 为这次读出的数据大小
 
 	var bd string
 	bd = string(buf[:n])
@@ -437,7 +431,7 @@ func rebootHandler(w http.ResponseWriter, r *http.Request) {
 
 	device.Accessaries = nil
 	device.Accessarysenders = nil
-	labels := []string{"Light","Curtain"}
+	labels := []string{"Light", "Curtain"}
 	for _, label := range labels {
 		projectUrl := "http://localhost:52030/api/v1/project/" + label
 		var projectlist, _ = httpsender.GetMessage(projectUrl)
