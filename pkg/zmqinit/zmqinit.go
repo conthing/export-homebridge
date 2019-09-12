@@ -4,16 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
+	"github.com/conthing/export-homebridge/pkg/common"
 	"github.com/conthing/export-homebridge/pkg/device"
 	httpsender "github.com/conthing/export-homebridge/pkg/http"
 
-	"github.com/conthing/utils/common"
-	"github.com/gorilla/mux"
 	zmq "github.com/pebbe/zmq4"
 )
 
@@ -23,9 +20,9 @@ type CommandZmq struct {
 	Service string `json:"service"`
 	ID      string `json:"id"`
 	Command struct {
-		Name   string `json:"name"` //结构体里面嵌套结构体，可以存在两个Name
+		Name   string `json:"name"`
 		Params interface{}
-	} `json:"command"` //这个对应的是Command，也是正确的语法
+	} `json:"command"`
 }
 type Event struct {
 	Device   string
@@ -66,27 +63,26 @@ type StCurtainCharacteristic struct {
 	Percent int `json:"percent"`
 }
 
-var QRcode string
 var newPublisher *zmq.Socket
-var statuspubport string //statuspubport是publish的port，在这里是9998
-func InitZmq(statusport string) error { //初始化zmq，赋值statuspubport
+
+func InitZmq(statusport string) error {
 	var err error
-	newPublisher, err = zmq.NewSocket(zmq.PUB) //todo 需要研究  ?????
+	newPublisher, err = zmq.NewSocket(zmq.PUB)
 	if err != nil {
 		return err
 	}
-	statuspubport = statusport
+	common.Statuspubport = statusport
 	fmt.Println("zmq bind to ", statusport)
-	_ = newPublisher.Bind(statusport)  //todo 需要研究  ?????
+	_ = newPublisher.Bind(statusport)
 	time.Sleep(200 * time.Millisecond) //休眠200ms
 	return nil
 }
-func ZmqInit() error { //zmq初始化，
-	context, err := zmq.NewContext() //todo 需要研究 ?????
+func ZmqInit() error {
+	context, err := zmq.NewContext()
 	if err != nil {
 		return err
 	}
-	commandRep, err := context.NewSocket(zmq.REP) //todo 需要研究?????
+	commandRep, err := context.NewSocket(zmq.REP)
 	if err != nil {
 		return err
 	}
@@ -102,23 +98,23 @@ func ZmqInit() error { //zmq初始化，
 	}
 	var commandzmq CommandZmq
 	for {
-		msg, err := commandRep.Recv(0) //recieve message by commandrep todo 需要研究  ?????
+		msg, err := commandRep.Recv(0) //recieve message by commandrep
 		if err != nil {
 			return err //有err输出err
 		}
-		msgbyte := []byte(msg)                             //将字符串类型的msg强制转换成为字节数组类型的msgbyte
-		err = json.Unmarshal([]byte(msgbyte), &commandzmq) //json非序列化
-		if err != nil {                                    //有err输出err
+		msgbyte := []byte(msg)
+		err = json.Unmarshal([]byte(msgbyte), &commandzmq)
+		if err != nil {
 			log.Println(err)
 			return err
 		}
-		fmt.Println("Got", string(msg))  //todo msg本身的类型就是string，为什么还要加上string
-		_, err = commandRep.Send(msg, 0) //todo 需要研究  ?????
+		fmt.Println("Got", string(msg))
+		_, err = commandRep.Send(msg, 0)
 		if err != nil {
 			return err
 		}
 		if commandzmq.Command.Name == "init" {
-			QRcode = commandzmq.Command.Params.(map[string]interface{})["QRcode"].(string) //todo  需要研究  ?????
+			common.QRcode = commandzmq.Command.Params.(map[string]interface{})["QRcode"].(string)
 			for i := range device.Accessarysenders {
 				var deviceid = device.Accessarysenders[i].ID
 				for n := range device.Accessarysenders[i].Commands {
@@ -151,7 +147,7 @@ func getEdgexParams(commandzmq CommandZmq) (edgexParams string, commandname stri
 	params := commandzmq.Command.Params
 	fmt.Println("params: ", params)
 	data := make(map[string]string)
-	if params.(map[string]interface{})["onOrOff"] != nil { //todo commandname=onoff/percent/brightness 需要研究  ?????
+	if params.(map[string]interface{})["onOrOff"] != nil {
 		onoroff := params.(map[string]interface{})["onOrOff"].(bool)
 		data["onoff"] = strconv.FormatBool(onoroff)
 		commandname = "onoff"
@@ -166,8 +162,8 @@ func getEdgexParams(commandzmq CommandZmq) (edgexParams string, commandname stri
 	} else {
 		fmt.Println("other type")
 	}
-	datajson, err := json.Marshal(data) //data进行json序列化
-	if err != nil {                     //有err输出err
+	datajson, err := json.Marshal(data)
+	if err != nil {
 		return "", "", err
 	}
 	edgexParams = string(datajson)
@@ -215,36 +211,12 @@ func sendcommand(proxyid string, params string, commandname string) {
 	}
 }
 
-//这个commandform看明白了
 func commandform(commandid string, deviceid string) string {
 	controlstring := "http://localhost:48082/api/v1/device/"
 	controlcommand := controlstring + deviceid + "/command/" + commandid
 	return controlcommand
 }
 
-//todo 需要研究  ?????
-func commandHandler(w http.ResponseWriter, r *http.Request) {
-
-	defer func() {
-		err := r.Body.Close()
-		if err != nil {
-			return
-		}
-	}()
-	buf := make([]byte, 1024) // 1024为缓存大小，即每次读出的最大数据
-	n, _ := r.Body.Read(buf)  // 为这次读出的数据大小
-	log.Print("n: ", n)
-	var bd string
-	bd = string(buf[:n])
-	log.Print("222", bd)
-	err := EventHanler(bd)
-	if err != nil {
-		return
-	}
-	//4.对收到的event进行处理，然后发给js   status
-}
-
-//todo 需要研究  半知半解  ?????
 func EventHanler(bd string) (err error) {
 	var event Event
 	var status map[string]interface{}
@@ -309,81 +281,4 @@ func EventHanler(bd string) (err error) {
 		}
 	}
 	return
-}
-
-////todo LoadRestRoutes最好单独放到一个rest.go
-//LoadRestRoutes 定义REST资源  todo  需要研究 ?????
-func LoadRestRoutes() http.Handler {
-	r := mux.NewRouter()
-	r.HandleFunc("/rest", commandHandler).Methods(http.MethodGet, http.MethodPost)
-	r.HandleFunc("/api/v1/version", versionHandler).Methods(http.MethodGet)
-	r.HandleFunc("/api/v1/reboot", rebootHandler).Methods(http.MethodPost)
-	r.HandleFunc("/api/v1/homebridge/qrcode", qrcodeHandler).Methods(http.MethodGet)
-	r.HandleFunc("/api/v1/ping", pingHandler).Methods(http.MethodGet)
-	return r
-}
-
-// Respond with PINGRESPONSE to see if the service is alive
-func pingHandler(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("pong"))
-}
-
-func qrcodeHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("Request", r)
-	w.Header().Set("Content-Type", "text/plain")
-	pincode := device.Pincode
-	if pincode == "" {
-		fmt.Println("ErrPincodeNil")
-		_, err := w.Write([]byte("ErrPincodeNil")) //多个homebridge的数据再组
-		if err != nil {
-			return
-		}
-	}
-	var data map[string]string = map[string]string{}
-	var datasend []map[string]string
-	data["pincode"] = pincode
-	data["QRcode"] = QRcode
-	datasend = append(datasend, data)
-	datajson, err := json.MarshalIndent(datasend, "", " ")
-	if err != nil {
-		return
-	}
-	_, err = w.Write([]byte(datajson)) //多个homebridge的数据再组
-	if err != nil {
-		return
-	}
-}
-func versionHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain")
-	version := common.Version
-	currentTime := common.BuildTime
-	fmt.Println("version", version)
-	fmt.Println("Time", currentTime)
-	datastring := strings.Join([]string{version, currentTime}, " ")
-	_, err := w.Write([]byte(datastring)) //多个homebridge的数据再组
-	if err != nil {
-		return
-	}
-}
-func rebootHandler(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		err := r.Body.Close()
-		if err != nil {
-			return
-		}
-	}()
-	buf := make([]byte, 1024) // 1024为缓存大小，即每次读出的最大数据
-	n, _ := r.Body.Read(buf)  // 为这次读出的数据大小
-	var bd string
-	bd = string(buf[:n])
-	log.Print("333", bd)
-	device.Accessaries = nil
-	device.Accessarysenders = nil
-	labels := []string{"Light", "Curtain"}
-	for _, label := range labels {
-		projectUrl := "http://localhost:52030/api/v1/project/" + label
-		var projectlist, _ = httpsender.GetMessage(projectUrl)
-		_ = device.Decode(projectlist, label, statuspubport)
-	}
 }

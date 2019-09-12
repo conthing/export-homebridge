@@ -21,6 +21,7 @@ import ( //导入的包包括3部分:1、goland自带的包；2、项目文件�
 	"time"
 
 	httpsender "github.com/conthing/export-homebridge/pkg/http"
+	"github.com/conthing/export-homebridge/pkg/router"
 	zmqinit "github.com/conthing/export-homebridge/pkg/zmqinit"
 	"github.com/conthing/utils/common"
 
@@ -104,15 +105,15 @@ func main() {
 //有errs会使export-homebridge进程崩掉
 func startHTTPServer(errChan chan error, port int) {
 	go func() {
-		r := zmqinit.LoadRestRoutes()
-		errChan <- http.ListenAndServe(":"+strconv.Itoa(port), context.ClearHandler(r)) //todo 需要研究?????
+		r := router.LoadRestRoutes()
+		errChan <- http.ListenAndServe(":"+strconv.Itoa(port), context.ClearHandler(r))
 	}()
 }
 
 //监听中断，如遇到ctrl+c等的可使export-homebridge直接结束掉，前提是export-homebridge得前台单独启动
 func listenForInterrupt(errChan chan error) {
 	go func() {
-		c := make(chan os.Signal) //todo  需要研究
+		c := make(chan os.Signal)
 		signal.Notify(c, syscall.SIGINT)
 		errChan <- fmt.Errorf("%s", <-c)
 	}()
