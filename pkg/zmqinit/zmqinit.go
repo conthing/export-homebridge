@@ -319,8 +319,16 @@ func LoadRestRoutes() http.Handler {
 	r.HandleFunc("/api/v1/version", versionHandler).Methods(http.MethodGet)
 	r.HandleFunc("/api/v1/reboot", rebootHandler).Methods(http.MethodPost)
 	r.HandleFunc("/api/v1/homebridge/qrcode", qrcodeHandler).Methods(http.MethodGet)
+	r.HandleFunc("/api/v1/ping", pingHandler).Methods(http.MethodGet)
 	return r
 }
+
+// Respond with PINGRESPONSE to see if the service is alive
+func pingHandler(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte("pong"))
+}
+
 func qrcodeHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Request", r)
 	w.Header().Set("Content-Type", "text/plain")
