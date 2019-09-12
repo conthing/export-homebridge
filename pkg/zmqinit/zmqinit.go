@@ -3,17 +3,18 @@ package zmqinit
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/conthing/export-homebridge/pkg/device"
-	"github.com/conthing/export-homebridge/pkg/errorHandle"
-	httpsender "github.com/conthing/export-homebridge/pkg/http"
-	"github.com/conthing/utils/common"
-	"github.com/gorilla/mux"
-	zmq "github.com/pebbe/zmq4"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/conthing/export-homebridge/pkg/device"
+	httpsender "github.com/conthing/export-homebridge/pkg/http"
+
+	"github.com/conthing/utils/common"
+	"github.com/gorilla/mux"
+	zmq "github.com/pebbe/zmq4"
 )
 
 //CommandZmq is the command from zmq
@@ -72,7 +73,7 @@ func InitZmq(statusport string) error { //初始化zmq，赋值statuspubport
 	var err error
 	newPublisher, err = zmq.NewSocket(zmq.PUB) //todo 需要研究  ?????
 	if err != nil {
-		return errorHandle.ErrSocketFail
+		return err
 	}
 	statuspubport = statusport
 	fmt.Println("zmq bind to ", statusport)
@@ -83,11 +84,11 @@ func InitZmq(statusport string) error { //初始化zmq，赋值statuspubport
 func ZmqInit() error { //zmq初始化，
 	context, err := zmq.NewContext() //todo 需要研究 ?????
 	if err != nil {
-		return errorHandle.ErrContextFail
+		return err
 	}
 	commandRep, err := context.NewSocket(zmq.REP) //todo 需要研究?????
 	if err != nil {
-		return errorHandle.ErrSocketFail
+		return err
 	}
 	defer func() {
 		err = commandRep.Close()
@@ -97,24 +98,24 @@ func ZmqInit() error { //zmq初始化，
 	}()
 	err = commandRep.Connect("tcp://127.0.0.1:9998")
 	if err != nil {
-		return errorHandle.ErrConnectFail
+		return err
 	}
 	var commandzmq CommandZmq
 	for {
 		msg, err := commandRep.Recv(0) //recieve message by commandrep todo 需要研究  ?????
 		if err != nil {
-			return errorHandle.ErrRevFail //有err输出err
+			return err //有err输出err
 		}
 		msgbyte := []byte(msg)                             //将字符串类型的msg强制转换成为字节数组类型的msgbyte
 		err = json.Unmarshal([]byte(msgbyte), &commandzmq) //json非序列化
 		if err != nil {                                    //有err输出err
 			log.Println(err)
-			return errorHandle.ErrUnmarshalFail
+			return err
 		}
 		fmt.Println("Got", string(msg))  //todo msg本身的类型就是string，为什么还要加上string
 		_, err = commandRep.Send(msg, 0) //todo 需要研究  ?????
 		if err != nil {
-			return errorHandle.ErrSendFail
+			return err
 		}
 		if commandzmq.Command.Name == "init" {
 			QRcode = commandzmq.Command.Params.(map[string]interface{})["QRcode"].(string) //todo  需要研究  ?????
@@ -167,7 +168,7 @@ func getEdgexParams(commandzmq CommandZmq) (edgexParams string, commandname stri
 	}
 	datajson, err := json.Marshal(data) //data进行json序列化
 	if err != nil {                     //有err输出err
-		return "", "", errorHandle.ErrMarshalFail
+		return "", "", err
 	}
 	edgexParams = string(datajson)
 	return edgexParams, commandname, nil //返回函数的3个要输出的参数
@@ -253,7 +254,7 @@ func EventHanler(bd string) (err error) {
 	err = json.Unmarshal([]byte(bytestr), &event)
 	if err != nil {
 		log.Println(err)
-		return errorHandle.ErrReadFail
+		return err
 	}
 	devicename := event.Device
 	for i := range device.Accessaries {
@@ -299,7 +300,7 @@ func EventHanler(bd string) (err error) {
 	}
 	data, err := json.MarshalIndent(status, "", " ")
 	if err != nil {
-		return errorHandle.ErrMarshalFail
+		return err
 	}
 	if string(data) != "{}" {
 		fmt.Println("send to js ", string(data))

@@ -4,14 +4,15 @@ import ( //import中的包GoLand会根据代码自动加入，github上的包需
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/conthing/export-homebridge/pkg/device"
-	"github.com/conthing/export-homebridge/pkg/errorHandle"
-	"github.com/edgexfoundry/go-mod-core-contracts/models"
-	jsoniter "github.com/json-iterator/go" //虽然不知道怎么使用，但是从代码的使用情况反推出它是"github.com/json-iterator
 	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/conthing/export-homebridge/pkg/device"
+
+	"github.com/edgexfoundry/go-mod-core-contracts/models"
+	"github.com/json-iterator/go" //虽然不知道怎么使用，但是从代码的使用情况反推出它是"github.com/json-iterator
 	//  /go"中的包go，可以进行函数的调用，比如调用json-iterator/go中的Get函数:jsoniter.Get(lightprojectlist)
 )
 
@@ -31,7 +32,7 @@ func HttpPost(statusport string) error { //todo 注册中的ID、Created、Modif
 	//// todo 无效的代码要删掉
 	data, err := json.Marshal(reg) // 对变量reg进行json序列化
 	if err != nil {                //有err，export-homebridge就起不起来，因为没有注册成功
-		return errorHandle.ErrMarshalFail
+		return err
 	}
 	////todo data转成string又转回来，没必要
 	//var jsonstr = []byte(string(data))   //todo data本身就是[]byte类型，有点多此一举
@@ -70,7 +71,7 @@ func HttpPost(statusport string) error { //todo 注册中的ID、Created、Modif
 	}
 
 	if jsoniter.Get(lightprojectlist).Size() == 0 && jsoniter.Get(curtainprojectlist).Size() == 0 {
-		return errorHandle.ErrSizeNil //如果灯光、窗帘等虚拟设备一个都没有则export-homebridge起不起来
+		return err //如果灯光、窗帘等虚拟设备一个都没有则export-homebridge起不起来
 	} //todo 为什么有Size()函数  ?????
 	////todo 此处err没有判断，所有的返回值必须判断
 	err = device.Decode(lightprojectlist, "Light", statusport) //todo 虽然decode函数定义返回的类型是error，可是为什么要两句代码输出的都是err
@@ -86,7 +87,7 @@ func HttpPost(statusport string) error { //todo 注册中的ID、Created、Modif
 func GetMessage(msg string) (body []byte, err error) { //GetMessage函数定义
 	resp, err := http.Get(msg) //http.Get函数返回两个参数:resp err
 	if err != nil {            //如果有err则返回ErrGetFail
-		return nil, errorHandle.ErrGetFail
+		return nil, err
 	}
 
 	defer func() { //defer延迟函数
@@ -100,7 +101,7 @@ func GetMessage(msg string) (body []byte, err error) { //GetMessage函数定义
 		// handle error
 		////todo 日志统一采用utils中的package
 		log.Println(err)
-		return nil, errorHandle.ErrReadFail
+		return nil, err
 	}
 
 	return
@@ -115,7 +116,7 @@ func Put(commandstring string, params string) (status string, err error) {
 	payload := strings.NewReader(params)                       //todo 不知道为什么这样?????
 	req, err := http.NewRequest("PUT", commandstring, payload) //todo 不知道为什么需要这样?????
 	if err != nil {                                            //有错返回错
-		return "", errorHandle.ErrRequestFail
+		return "", err
 	}
 	req.Header.Add("Content-Type", "application/json") //todo 这3个header一定需要吗  可有可无的最好全部不要  必不可少的才要 保证代码的精简
 	////todo 这个author是什么，加注释
@@ -126,7 +127,7 @@ func Put(commandstring string, params string) (status string, err error) {
 	res, err := http.DefaultClient.Do(req) //todo 这个牵涉的面很多  得深入了解  ?????
 	if err != nil {                        //有err打印err
 		fmt.Println(err)
-		return "", errorHandle.ErrPutFail
+		return "", err
 	}
 	status = res.Status //todo res里面有Status从哪里判断出来的?????
 	defer func() {      //defer延迟函数
