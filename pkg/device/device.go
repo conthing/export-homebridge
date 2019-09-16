@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/conthing/export-homebridge/pkg/logger"
+
 	"github.com/conthing/utils/common"
 )
 
@@ -86,14 +88,13 @@ func Decode(jsonStr []byte, label string, statusport string) error {
 		accessary.ProxyID = project.Id
 		accessary.Accessory = "Control4"
 		commands := accessarysender.Commands
-		//这个switch语句用在生成的config.json文件中
 		switch label {
 		case "Light":
 			accessary.Service = "Lightbulb"
 		case "Curtain":
 			accessary.Service = "WindowCovering"
 		default:
-			fmt.Println("不存相应设备")
+			logger.WARN("不存相应设备")
 		}
 		//这个for循环用在web上的zigbee设备的name如果相同则对应的虚拟设备灯光的alias也相同，这是在后面加上(1、2、3....)以示区分
 		for _, projectcommand := range project.Commands {
@@ -104,7 +105,7 @@ func Decode(jsonStr []byte, label string, statusport string) error {
 							accessary.Name = projectcommand.Value
 						} else {
 							accessary.Name = fmt.Sprintf("%s(%d)", projectcommand.Value, index)
-							fmt.Println("accessary.Name: ", accessary.Name)
+							logger.INFO("accessary.Name: ", accessary.Name)
 							index++
 							break
 						}
@@ -112,7 +113,6 @@ func Decode(jsonStr []byte, label string, statusport string) error {
 				} else {
 					accessary.Name = projectcommand.Value
 				}
-				//如果是可调光的灯光就直接显示这盏灯的值
 			} else if projectcommand.Name == "dimmerable" {
 				accessary.Dimmerable = projectcommand.Value
 			}

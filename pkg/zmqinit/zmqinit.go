@@ -3,13 +3,13 @@ package zmqinit
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
 	"github.com/conthing/export-homebridge/pkg/common"
 	"github.com/conthing/export-homebridge/pkg/device"
 	httpsender "github.com/conthing/export-homebridge/pkg/http"
+	"github.com/conthing/export-homebridge/pkg/logger"
 
 	zmq "github.com/pebbe/zmq4"
 )
@@ -100,12 +100,12 @@ func ZmqInit() error {
 	for {
 		msg, err := commandRep.Recv(0) //recieve message by commandrep
 		if err != nil {
-			return err //有err输出err
+			return err
 		}
 		msgbyte := []byte(msg)
 		err = json.Unmarshal([]byte(msgbyte), &commandzmq)
 		if err != nil {
-			log.Println(err)
+			logger.ERROR(err)
 			return err
 		}
 		fmt.Println("Got", string(msg))
@@ -210,13 +210,11 @@ func sendcommand(proxyid string, params string, commandname string) {
 		}
 	}
 }
-
 func commandform(commandid string, deviceid string) string {
 	controlstring := "http://localhost:48082/api/v1/device/"
 	controlcommand := controlstring + deviceid + "/command/" + commandid
 	return controlcommand
 }
-
 func EventHanler(bd string) (err error) {
 	var event Event
 	var status map[string]interface{}
@@ -225,7 +223,7 @@ func EventHanler(bd string) (err error) {
 	bytestr := []byte(bd)
 	err = json.Unmarshal([]byte(bytestr), &event)
 	if err != nil {
-		log.Println(err)
+		logger.ERROR(err)
 		return err
 	}
 	devicename := event.Device
