@@ -3,14 +3,13 @@ package http
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 
 	"github.com/conthing/export-homebridge/pkg/device"
-	"github.com/conthing/export-homebridge/pkg/logger"
 
+	"github.com/conthing/utils/common"
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
 	"github.com/json-iterator/go"
 )
@@ -36,7 +35,7 @@ func HttpPost(statusport string) error {
 		"application/json",
 		bytes.NewBuffer(data))
 	if err != nil {
-		logger.ERROR(err)
+		common.Log.Error(err)
 		return err
 	}
 	defer func() { //defer是一个延迟函数，在这里defer调用func()空函数，在这个函数之外出现panic、每当执行到return
@@ -50,10 +49,9 @@ func HttpPost(statusport string) error {
 	if err != nil {
 		return err
 	}
-	logger.INFO(string(body)) //打印注册的数据
-	////todo 排版缩进用工具调整下
+	common.Log.Info(string(body)) //打印注册的数据
 	////todo 固定的url用const
-	// 第二步:获取设备列表
+	// 第二步:获取设备列表+
 	lightprojectUrl := "http://localhost:52030/api/v1/project/Light"
 	lightprojectlist, err := GetMessage(lightprojectUrl)
 	if err != nil {
@@ -93,7 +91,7 @@ func GetMessage(msg string) (body []byte, err error) {
 	}()
 	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logger.ERROR(err)
+		common.Log.Error(err)
 		return nil, err
 	}
 	return
@@ -101,8 +99,8 @@ func GetMessage(msg string) (body []byte, err error) {
 
 ////todo commandstring应该命名成url
 func Put(commandstring string, params string) (status string, err error) {
-	fmt.Println("commandstring :", commandstring)
-	fmt.Println("params :", params)
+	common.Log.Info("commandstring :", commandstring)
+	common.Log.Info("params :", params)
 	payload := strings.NewReader(params)
 	req, err := http.NewRequest("PUT", commandstring, payload)
 	if err != nil {
@@ -115,7 +113,8 @@ func Put(commandstring string, params string) (status string, err error) {
 	req.Header.Add("Date", "Wed, 12 Sep 2018 02:10:09 GMT")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		common.Log.Error(err)
+		common.Log.Error(err)
 		return "", err
 	}
 	status = res.Status

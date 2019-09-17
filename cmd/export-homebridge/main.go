@@ -16,8 +16,6 @@ import (
 	"time"
 
 	httpsender "github.com/conthing/export-homebridge/pkg/http"
-	"github.com/conthing/export-homebridge/pkg/logger"
-	"github.com/conthing/export-homebridge/pkg/router"
 	zmqinit "github.com/conthing/export-homebridge/pkg/zmqinit"
 
 	"github.com/conthing/utils/common"
@@ -30,6 +28,7 @@ type Config struct {
 	Serial   serial.Config
 	HTTP     HTTPConfig
 	Commands []CommandConfig
+	Log      common.LoggerConfig
 }
 
 //HTTPConfig is the port from config
@@ -76,10 +75,10 @@ func main() {
 	flag.StringVar(&cfgfile, "config", "configuration.toml", "Specify a profile other than default.") //如定义字符串就按定义的字符串来否则默认使用configuration.toml
 	flag.StringVar(&cfgfile, "c", "configuration.toml", "Specify a profile other than default.")      //两种方式 同上
 	flag.Parse()
-	logger.InitLogger()
 	err := common.LoadConfig(cfgfile, &cfg)
+	common.InitLogger(&cfg.Log)
 	if err != nil {
-		logger.ERROR("failed to load config %v", err)
+		common.Log.Errorf("failed to load config %v", err)
 		return
 	}
 	if common.Bootstrap(boot, nil, 60000, 2000) != nil {
@@ -90,17 +89,17 @@ func main() {
 	startHTTPServer(errs, cfg.HTTP.Port)
 	startZMQReceive(errs)
 	// Time it took to start service
-	logger.INFO("HTTP server listening on port %d, started in: %s", cfg.HTTP.Port, time.Since(start).String())
+	common.Log.Infof("HTTP server listening on port %d, started in: %s", cfg.HTTP.Port, time.Since(start).String())
 	// recv error channel
 	c := <-errs
-	logger.INFO("erminating: %v", c)
+	common.Log.Infof("erminating: %v", c)
 	os.Exit(0)
 }
 
 //有errs会使export-homebridge进程崩掉
 func startHTTPServer(errChan chan error, port int) {
 	go func() {
-		r := router.LoadRestRoutes()
+		r := LoadRestRoutes()
 		errChan <- http.ListenAndServe(":"+strconv.Itoa(port), context.ClearHandler(r))
 	}()
 }

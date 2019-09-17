@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/conthing/export-homebridge/pkg/logger"
-
 	"github.com/conthing/utils/common"
 )
 
@@ -94,7 +92,7 @@ func Decode(jsonStr []byte, label string, statusport string) error {
 		case "Curtain":
 			accessary.Service = "WindowCovering"
 		default:
-			logger.WARN("不存相应设备")
+			common.Log.Warn("不存相应设备")
 		}
 		//这个for循环用在web上的zigbee设备的name如果相同则对应的虚拟设备灯光的alias也相同，这是在后面加上(1、2、3....)以示区分
 		for _, projectcommand := range project.Commands {
@@ -105,7 +103,7 @@ func Decode(jsonStr []byte, label string, statusport string) error {
 							accessary.Name = projectcommand.Value
 						} else {
 							accessary.Name = fmt.Sprintf("%s(%d)", projectcommand.Value, index)
-							logger.INFO("accessary.Name: ", accessary.Name)
+							common.Log.Info("accessary.Name: ", accessary.Name)
 							index++
 							break
 						}

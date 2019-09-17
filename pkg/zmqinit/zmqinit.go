@@ -2,15 +2,13 @@ package zmqinit
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"time"
 
-	"github.com/conthing/export-homebridge/pkg/common"
 	"github.com/conthing/export-homebridge/pkg/device"
 	httpsender "github.com/conthing/export-homebridge/pkg/http"
-	"github.com/conthing/export-homebridge/pkg/logger"
 
+	"github.com/conthing/utils/common"
 	zmq "github.com/pebbe/zmq4"
 )
 
@@ -64,6 +62,8 @@ type StCurtainCharacteristic struct {
 }
 
 var newPublisher *zmq.Socket
+var Statuspubport string
+var QRcode string
 
 func InitZmq(statusport string) error {
 	var err error
@@ -71,8 +71,8 @@ func InitZmq(statusport string) error {
 	if err != nil {
 		return err
 	}
-	common.Statuspubport = statusport
-	fmt.Println("zmq bind to ", statusport)
+	Statuspubport = statusport
+	common.Log.Info("zmq bind to ", statusport)
 	_ = newPublisher.Bind(statusport)
 	time.Sleep(200 * time.Millisecond) //休眠200ms
 	return nil
@@ -105,22 +105,22 @@ func ZmqInit() error {
 		msgbyte := []byte(msg)
 		err = json.Unmarshal([]byte(msgbyte), &commandzmq)
 		if err != nil {
-			logger.ERROR(err)
+			common.Log.Error(err)
 			return err
 		}
-		fmt.Println("Got", string(msg))
+		common.Log.Info("Got: ", string(msg))
 		_, err = commandRep.Send(msg, 0)
 		if err != nil {
 			return err
 		}
 		if commandzmq.Command.Name == "init" {
-			common.QRcode = commandzmq.Command.Params.(map[string]interface{})["QRcode"].(string)
+			QRcode = commandzmq.Command.Params.(map[string]interface{})["QRcode"].(string)
 			for i := range device.Accessarysenders {
 				var deviceid = device.Accessarysenders[i].ID
 				for n := range device.Accessarysenders[i].Commands {
 					var commandid = device.Accessarysenders[i].Commands[n].ID
 					statuscommand := commandform(commandid, deviceid)
-					fmt.Println("statuscommand: ", statuscommand)
+					common.Log.Info("statuscommand: ", statuscommand)
 					result, err := httpsender.GetMessage(statuscommand)
 					if err != nil {
 						return err
@@ -145,7 +145,7 @@ func ZmqInit() error {
 }
 func getEdgexParams(commandzmq CommandZmq) (edgexParams string, commandname string, err error) {
 	params := commandzmq.Command.Params
-	fmt.Println("params: ", params)
+	common.Log.Info("params: ", params)
 	data := make(map[string]string)
 	if params.(map[string]interface{})["onOrOff"] != nil {
 		onoroff := params.(map[string]interface{})["onOrOff"].(bool)
@@ -160,7 +160,7 @@ func getEdgexParams(commandzmq CommandZmq) (edgexParams string, commandname stri
 		data["brightness"] = strconv.FormatInt(int64(brightness), 10)
 		commandname = "brightness"
 	} else {
-		fmt.Println("other type")
+		common.Log.Info("other type")
 	}
 	datajson, err := json.Marshal(data)
 	if err != nil {
@@ -183,7 +183,7 @@ func sendcommand(proxyid string, params string, commandname string) {
 						if err != nil {
 							return
 						}
-						fmt.Println("put result", string(result))
+						common.Log.Info("put result", string(result))
 					}
 				case "percent":
 					commandid := device.Accessarysenders[j].Commands[k].ID
@@ -192,7 +192,7 @@ func sendcommand(proxyid string, params string, commandname string) {
 					if err != nil {
 						return
 					}
-					fmt.Println("put result", string(result))
+					common.Log.Info("put result", string(result))
 				case "onoff":
 					if commandname == "onoff" {
 						commandid := device.Accessarysenders[j].Commands[k].ID
@@ -201,10 +201,10 @@ func sendcommand(proxyid string, params string, commandname string) {
 						if err != nil {
 							return
 						}
-						fmt.Println("put result", string(result))
+						common.Log.Info("put result", string(result))
 					}
 				default:
-					fmt.Println("in default")
+					common.Log.Info("in default")
 				}
 			}
 		}
@@ -219,11 +219,11 @@ func EventHanler(bd string) (err error) {
 	var event Event
 	var status map[string]interface{}
 	status = make(map[string]interface{})
-	fmt.Println("收到的event： ", bd)
+	common.Log.Info("收到的event： ", bd)
 	bytestr := []byte(bd)
 	err = json.Unmarshal([]byte(bytestr), &event)
 	if err != nil {
-		logger.ERROR(err)
+		common.Log.Error(err)
 		return err
 	}
 	devicename := event.Device
@@ -273,7 +273,7 @@ func EventHanler(bd string) (err error) {
 		return err
 	}
 	if string(data) != "{}" {
-		fmt.Println("send to js ", string(data))
+		common.Log.Info("send to js ", string(data))
 		if newPublisher != nil {
 			_, err = newPublisher.SendMessage("status", data)
 		}
