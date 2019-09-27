@@ -1,4 +1,4 @@
-package device
+package homebridgeconfig
 
 import (
 	"encoding/json"
@@ -69,50 +69,46 @@ type Accessarysender struct {
 var Accessaries []Accessary
 var Accessarysenders []Accessarysender
 var Pincode string
+var accessary Accessary             //定义accessary变量，类型为Accessary
+var accessarysender Accessarysender //定义accessarysender变量，类型为Accessarysender
 
-//定义Decode函数，这个函数主要做:1、zigbee设备的name相同时则对应的虚拟设备的alias就会相同，这个函数就保证了homekit上的虚拟设备
-//的alias没有重名的，相同alias的会在其后加((1)、(2)、(3)....等等表示)，就是下方的的index := 1；2、homekit上的虚拟设备如果是调
-//光灯在控制的时候就显示百分百，如果是开关灯在控制的时候就显示开和关；3、指定homebridge的config.json文件的生成路径；
-func Decode(jsonStr []byte, label string, statusport string) error {
-	var projects []Project
-	err := json.Unmarshal(jsonStr, &projects)
-	if err != nil {
-		return err
-	}
-	index := 1
-	for _, project := range projects {
-		var accessary Accessary
-		var accessarysender Accessarysender
-		accessary.ProxyID = project.Id
-		accessary.Accessory = "Control4"
-		commands := accessarysender.Commands
-		switch label {
-		case "Light":
-			accessary.Service = "Lightbulb"
-		case "Curtain":
-			accessary.Service = "WindowCovering"
-		default:
-			common.Log.Warn("不存相应设备")
+func changeNameUponConflict(oldname string) (name string) {
+	name = oldname
+	if Accessaries != nil {
+		index := 1
+		for i := 0; i < len(Accessaries); i++ { //去遍历Accessaries里面有没有Name重复的
+			access := Accessaries[i]
+			if access.Name == name { //如果有重复
+				name = fmt.Sprintf("%s(%d)", oldname, index) //在后面加(1)
+				index++
+				i = 0 // name 的index加1后，重新从i=0再遍历一遍有没有重复
+			}
 		}
+	}
+	return
+}
+
+/*定义GenerateHomebridgeConfig 函数，这个函数主要做:生成homebridge的config.json文件；执行这一步包括以下内容:1、zigbee设备的
+name相同时则对应的虚拟设备的alias就会相同，这个函数就保证了homekit上的虚拟设备的alias没有重名的，相同alias的会在其后加((1)、
+(2)、(3)....等等表示)，就是下方的的index := 1；2、homekit上的虚拟设备如果是调光灯在控制的时候就显示百分百，如果是开关灯在控制
+的时候就显示开和关；3、指定homebridge的config.json文件的生成路径；*/
+func GenerateHomebridgeConfig(lightdevice, curtaindevice []byte, statusport string) error {
+	var projects []Project
+	err := json.Unmarshal(lightdevice, &projects) //对light设备进行json非序列化动作，有err返回err
+	if err != nil {
+		common.Log.Errorf("GenerateHomebridgeConfig(lightdevice, curtaindevice []byte, statusport string) lightdevice json.Unmarshal(lightdevice, &projects) failed: %v", err)
+	}
+	for _, project := range projects { //定义project遍历52030中的light列表
+		accessary.ProxyID = project.Id   //将虚拟设备的Id赋值给accessary.ProxyID，注Id是从edgex分配来的
+		accessary.Accessory = "Control4" //对accessary.Service、accessary.Accessory进行字符串赋值，以上这些都是config.json文件中的
+		accessary.Service = "Lightbulb"
+		commands := accessarysender.Commands
 		//这个for循环用在web上的zigbee设备的name如果相同则对应的虚拟设备灯光的alias也相同，这是在后面加上(1、2、3....)以示区分
 		for _, projectcommand := range project.Commands {
-			if projectcommand.Name == "alias" {
-				if Accessaries != nil {
-					for _, access := range Accessaries {
-						if access.Name != projectcommand.Value {
-							accessary.Name = projectcommand.Value
-						} else {
-							accessary.Name = fmt.Sprintf("%s(%d)", projectcommand.Value, index)
-							common.Log.Info("accessary.Name: ", accessary.Name)
-							index++
-							break
-						}
-					}
-				} else {
-					accessary.Name = projectcommand.Value
-				}
-			} else if projectcommand.Name == "dimmerable" {
-				accessary.Dimmerable = projectcommand.Value
+			if projectcommand.Name == "alias" { //若projectcommand.Name等于alias则去遍历从52030获取的所有light的ailas，看是否有相同的
+				accessary.Name = changeNameUponConflict(projectcommand.Value)
+			} else if projectcommand.Name == "dimmerable" { //如果projectcommand.Name == "dimmerable"，则直接赋值accessary.Dimmerable = projectcommand.Value，
+				accessary.Dimmerable = projectcommand.Value // 注config.json中accessaries中只有proxy_id、name、dimmerable是需要从52030获取的，其它都是edgex分配的
 			}
 			var command Commands
 			command.ID = projectcommand.Id
@@ -122,22 +118,46 @@ func Decode(jsonStr []byte, label string, statusport string) error {
 		accessarysender.Commands = commands
 		accessarysender.Name = project.Name
 		accessarysender.ID = project.Id
-		accessarysender.Service = label
+		Accessaries = append(Accessaries, accessary)
+		Accessarysenders = append(Accessarysenders, accessarysender) //store deviceid and commandid
+	}
+	projects = []Project{}
+	err = json.Unmarshal(curtaindevice, &projects)
+	if err != nil {
+		common.Log.Errorf("GenerateHomebridgeConfig(lightdevice, curtaindevice []byte, statusport string) curtaindevice json.Unmarshal(curtaindevice, &projects) failed: %v", err)
+	}
+	for _, project := range projects {
+		accessary.ProxyID = project.Id
+		accessary.Accessory = "Control4"
+		accessary.Service = "WindowCovering"
+		commands := accessarysender.Commands
+		for _, projectcommand := range project.Commands {
+			if projectcommand.Name == "alias" {
+				accessary.Name = changeNameUponConflict(projectcommand.Value)
+			}
+			var command Commands
+			command.ID = projectcommand.Id
+			command.Name = projectcommand.Name
+			commands = append(commands, command)
+		}
+		accessarysender.Commands = commands
+		accessarysender.Name = project.Name
+		accessarysender.ID = project.Id
 		Accessaries = append(Accessaries, accessary)
 		Accessarysenders = append(Accessarysenders, accessarysender) //store deviceid and commandid
 	}
 	configdata, err := createConfigData(Accessaries, statusport)
 	if err != nil {
-		return err
+		common.Log.Errorf("createConfigData failed: %v", err)
 	}
 	b, err := json.MarshalIndent(configdata, "", " ")
 	if err != nil {
-		return err
+		common.Log.Errorf("b, err := json.MarshalIndent(configdata) failed: %v", err)
 	}
 	//生成config.json文件的路径
-	err = ioutil.WriteFile("/root/.homebridge/config.json", b, os.ModeAppend) //create config.json
+	err = ioutil.WriteFile("/root/.homebridge/config.json", b, os.ModePerm) //create config.json
 	if err != nil {
-		return err
+		common.Log.Errorf("ioutil.WriteFile(/root/.homebridge/config.json, b, os.ModePerm) failed: %v", err)
 	}
 	return nil
 }
@@ -152,6 +172,7 @@ func createConfigData(accessaries []Accessary, statusport string) (configdata Au
 		for i, pin := range pinstring {
 			n, err := strconv.ParseUint(pin, 16, 8)
 			if err != nil {
+				common.Log.Errorf("createConfigData(accessaries []Accessary, statusport string) n, err := strconv.ParseUint(pin, 16, 8) failed: %v", err)
 				return configdata, err
 			} else {
 				pinnum[i] = int(n)

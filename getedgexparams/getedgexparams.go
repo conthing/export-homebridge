@@ -1,4 +1,4 @@
-package http
+package getedgexparams
 
 import (
 	"bytes"
@@ -7,14 +7,17 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/conthing/export-homebridge/pkg/device"
-
+	"github.com/conthing/export-homebridge/homebridgeconfig"
 	"github.com/conthing/utils/common"
 	"github.com/edgexfoundry/go-mod-core-contracts/models"
-	"github.com/json-iterator/go"
 )
 
-////todo 大写开头的函数、结构体、变量、常量 加注释
+const (
+	LIGHTPROJECTURL   = "http://localhost:52030/api/v1/project/Light"
+	CURTAINPROJECTURL = "http://localhost:52030/api/v1/project/Curtain"
+	REGISTRATIONURL   = "http://localhost:48071/api/v1/registration"
+)
+
 //第一步:向edgex48071中注册(写)export-homebridge(http://localhost:48071/api/v1/registration)
 func HttpPost(statusport string) error {
 	reg := models.Registration{}
@@ -28,82 +31,69 @@ func HttpPost(statusport string) error {
 		Address: "localhost", Port: 8111, Path: "/rest"}
 	data, err := json.Marshal(reg)
 	if err != nil {
-		return err
+		common.Log.Errorf("HttpPost(statusport string) data json.Marshal failed: %v", err)
 	}
-	////todo 固定的url用const定义，或配置文件
-	resp, err := http.Post("http://localhost:48071/api/v1/registration",
-		"application/json",
-		bytes.NewBuffer(data))
+	resp, err := http.Post(REGISTRATIONURL, "application/json", bytes.NewBuffer(data))
 	if err != nil {
-		common.Log.Error(err)
-		return err
+		common.Log.Errorf("HttpPost(statusport string) http.Post failed: %v", err)
 	}
 	defer func() { //defer是一个延迟函数，在这里defer调用func()空函数，在这个函数之外出现panic、每当执行到return
 		//时就会执行defer，此时会关闭   加defer延迟函数的好处是可以在有错误的时候可以重新执行defer函数之外的函数
 		err = resp.Body.Close() //resp.Body.Close()会返回error类型的err，close()会发现最基本的错误
 		if err != nil {
-			return
+			common.Log.Errorf("HttpPost(statusport string) resp.Body.Close() failed: %v", err)
 		}
 	}()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		common.Log.Errorf("HttpPost(statusport string) ioutil.ReadAll(resp.Body) failed: %v", err)
 	}
 	common.Log.Info(string(body)) //打印注册的数据
-	////todo 固定的url用const
-	// 第二步:获取设备列表+
-	lightprojectUrl := "http://localhost:52030/api/v1/project/Light"
-	lightprojectlist, err := GetMessage(lightprojectUrl)
+
+	// 第二步:获取设备列表
+	lightdevicelist, err := GetMessage(LIGHTPROJECTURL)
 	if err != nil {
-		return err
+		common.Log.Errorf("GetMessage(LIGHTPROJECTURL) failed: %v", err)
 	}
-	curtainprojectUrl := "http://localhost:52030/api/v1/project/Curtain"
-	curtainprojectlist, err := GetMessage(curtainprojectUrl)
+	curtaindevicelist, err := GetMessage(CURTAINPROJECTURL)
 	if err != nil {
-		return err
+		common.Log.Errorf("GetMessage(CURTAINPROJECTURL) failed: %v", err)
 	}
-	//如果灯光、窗帘等虚拟设备一个都没有则export-homebridge起不起来
-	if jsoniter.Get(lightprojectlist).Size() == 0 && jsoniter.Get(curtainprojectlist).Size() == 0 {
-		return err
-	}
-	err = device.Decode(lightprojectlist, "Light", statusport)
+	err = homebridgeconfig.GenerateHomebridgeConfig(lightdevicelist, curtaindevicelist, statusport)
 	if err != nil {
-		return err
-	}
-	err = device.Decode(curtainprojectlist, "Curtain", statusport)
-	if err != nil {
-		return err
+		common.Log.Errorf("homebridgeconfig.GenerateHomebridgeConfig(lightdevicelist, curtaindevicelist, statusport) failed: %v", err)
 	}
 	return nil
 }
 
-////todo msg应该命名成url，命名必须自注释，驼峰命名法
-func GetMessage(msg string) (body []byte, err error) {
-	resp, err := http.Get(msg)
+func GetMessage(url string) (body []byte, err error) {
+	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
+		common.Log.Errorf(" GetMessage(url string) http.Get(url) failed: %v", err)
 	}
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
-			return
+			common.Log.Errorf(" GetMessage(url string) resp.Body.Close() failed: %v", err)
 		}
 	}()
 	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		common.Log.Error(err)
+		common.Log.Errorf(" GetMessage(url string) ioutil.ReadAll(resp.Body) failed: %v", err)
 		return nil, err
 	}
 	return
 }
 
-////todo commandstring应该命名成url
+////todo commandstring应该命名成url  ?????? commanfstring是输入参数 是什么  为什么要命名为url
 func Put(commandstring string, params string) (status string, err error) {
 	common.Log.Info("commandstring :", commandstring)
 	common.Log.Info("params :", params)
 	payload := strings.NewReader(params)
 	req, err := http.NewRequest("PUT", commandstring, payload)
 	if err != nil {
+		common.Log.Errorf("Put(commandstring string, params string) http.NewRequest(PUT, commandstring, payload) failed: %v", err)
 		return "", err
 	}
 	req.Header.Add("Content-Type", "application/json")
@@ -113,15 +103,14 @@ func Put(commandstring string, params string) (status string, err error) {
 	req.Header.Add("Date", "Wed, 12 Sep 2018 02:10:09 GMT")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		common.Log.Error(err)
-		common.Log.Error(err)
+		common.Log.Errorf("Put(commandstring string, params string) http.DefaultClient.Do(req) failed: %v", err)
 		return "", err
 	}
 	status = res.Status
 	defer func() {
 		err = res.Body.Close()
 		if err != nil {
-			return
+			common.Log.Errorf("Put(commandstring string, params string) res.Body.Close() failed: %v", err)
 		}
 	}()
 	return

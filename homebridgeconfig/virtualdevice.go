@@ -1,4 +1,4 @@
-package device
+package homebridgeconfig
 
 type Project struct {
 	Id       string

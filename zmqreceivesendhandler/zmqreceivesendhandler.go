@@ -1,15 +1,19 @@
-package zmqinit
+package zmqreceivesendhandler
 
 import (
 	"encoding/json"
 	"strconv"
 	"time"
 
-	"github.com/conthing/export-homebridge/pkg/device"
-	httpsender "github.com/conthing/export-homebridge/pkg/http"
+	"github.com/conthing/export-homebridge/getedgexparams"
+	"github.com/conthing/export-homebridge/homebridgeconfig"
 
 	"github.com/conthing/utils/common"
 	zmq "github.com/pebbe/zmq4"
+)
+
+const (
+	CONTROLSTRING = "http://localhost:48082/api/v1/device/"
 )
 
 //CommandZmq is the command from zmq
@@ -69,7 +73,7 @@ func InitZmq(statusport string) error {
 	var err error
 	newPublisher, err = zmq.NewSocket(zmq.PUB)
 	if err != nil {
-		return err
+		common.Log.Errorf("InitZmq(statusport string) zmq.NewSocket(zmq.PUB) failed: %v", err)
 	}
 	Statuspubport = statusport
 	common.Log.Info("zmq bind to ", statusport)
@@ -80,55 +84,54 @@ func InitZmq(statusport string) error {
 func ZmqInit() error {
 	context, err := zmq.NewContext()
 	if err != nil {
-		return err
+		common.Log.Errorf("ZmqInit() zmq.NewContext() failed: %v", err)
 	}
 	commandRep, err := context.NewSocket(zmq.REP)
 	if err != nil {
-		return err
+		common.Log.Errorf("ZmqInit() context.NewContext(zmq.REP) failed: %v", err)
 	}
 	defer func() {
 		err = commandRep.Close()
 		if err != nil {
-			return
+			common.Log.Errorf("ZmqInit() commandRep.Close() failed: %v", err)
 		}
 	}()
 	err = commandRep.Connect("tcp://127.0.0.1:9998")
 	if err != nil {
-		return err
+		common.Log.Errorf("ZmqInit() commandRep.Connect(tcp://127.0.0.1:9998) failed: %v", err)
 	}
 	var commandzmq CommandZmq
 	for {
 		msg, err := commandRep.Recv(0) //recieve message by commandrep
 		if err != nil {
-			return err
+			common.Log.Errorf("ZmqInit() commandRep.Recv(0) failed: %v", err)
 		}
 		msgbyte := []byte(msg)
 		err = json.Unmarshal([]byte(msgbyte), &commandzmq)
 		if err != nil {
-			common.Log.Error(err)
-			return err
+			common.Log.Errorf("ZmqInit() msgbyte json.Unmarshal([]byte(msgbyte), &commandzmq) failed: %v", err)
 		}
 		common.Log.Info("Got: ", string(msg))
 		_, err = commandRep.Send(msg, 0)
 		if err != nil {
-			return err
+			common.Log.Errorf("ZmqInit() commandRep.Send(msg, 0) failed: %v", err)
 		}
 		if commandzmq.Command.Name == "init" {
-			QRcode = commandzmq.Command.Params.(map[string]interface{})["QRcode"].(string)
-			for i := range device.Accessarysenders {
-				var deviceid = device.Accessarysenders[i].ID
-				for n := range device.Accessarysenders[i].Commands {
-					var commandid = device.Accessarysenders[i].Commands[n].ID
+			QRcode = commandzmq.Command.Params.(map[string]interface{})["QRcode"].(string) //todo 类型断言有可能失败
+			for i := range homebridgeconfig.Accessarysenders {
+				var deviceid = homebridgeconfig.Accessarysenders[i].ID
+				for n := range homebridgeconfig.Accessarysenders[i].Commands {
+					var commandid = homebridgeconfig.Accessarysenders[i].Commands[n].ID
 					statuscommand := commandform(commandid, deviceid)
 					common.Log.Info("statuscommand: ", statuscommand)
-					result, err := httpsender.GetMessage(statuscommand)
+					result, err := getedgexparams.GetMessage(statuscommand)
 					if err != nil {
-						return err
+						common.Log.Errorf("ZmqInit() getedgexparams.GetMessag(statuscommand) failed: %v", err)
 					}
 					if string(result) != "" {
 						err = EventHanler(string(result))
 						if err != nil {
-							return err
+							common.Log.Errorf("ZmqInit() EventHanler(string(result)) failed: %v", err)
 						}
 					}
 				}
@@ -136,7 +139,7 @@ func ZmqInit() error {
 		} else {
 			params, commandname, err := getEdgexParams(commandzmq)
 			if err != nil {
-				return err
+				common.Log.Errorf("ZmqInit() getEdgexParams(commandzmq) failed: %v", err)
 			}
 			id := commandzmq.ID
 			go sendcommand(id, params, commandname)
@@ -164,42 +167,42 @@ func getEdgexParams(commandzmq CommandZmq) (edgexParams string, commandname stri
 	}
 	datajson, err := json.Marshal(data)
 	if err != nil {
-		return "", "", err
+		common.Log.Errorf("getEdgexParams(commandzmq CommandZmq datajson json.Marshal(data) failed: %v", err)
 	}
 	edgexParams = string(datajson)
 	return edgexParams, commandname, nil //返回函数的3个要输出的参数
 }
 func sendcommand(proxyid string, params string, commandname string) {
-	for j := range device.Accessarysenders {
-		deviceid := device.Accessarysenders[j].ID
+	for j := range homebridgeconfig.Accessarysenders {
+		deviceid := homebridgeconfig.Accessarysenders[j].ID
 		if deviceid == proxyid {
-			for k := range device.Accessarysenders[j].Commands {
-				switch device.Accessarysenders[j].Commands[k].Name {
+			for k := range homebridgeconfig.Accessarysenders[j].Commands {
+				switch homebridgeconfig.Accessarysenders[j].Commands[k].Name {
 				case "brightness":
 					if commandname == "brightness" {
-						commandid := device.Accessarysenders[j].Commands[k].ID
+						commandid := homebridgeconfig.Accessarysenders[j].Commands[k].ID
 						controlcommand := commandform(commandid, deviceid)
-						result, err := httpsender.Put(controlcommand, params)
+						result, err := getedgexparams.Put(controlcommand, params)
 						if err != nil {
-							return
+							common.Log.Errorf("sendcommand(proxyid string, params string, commandname string) case brightness getedgexparams.Put failed: %v", err)
 						}
 						common.Log.Info("put result", string(result))
 					}
 				case "percent":
-					commandid := device.Accessarysenders[j].Commands[k].ID
+					commandid := homebridgeconfig.Accessarysenders[j].Commands[k].ID
 					controlcommand := commandform(commandid, deviceid)
-					result, err := httpsender.Put(controlcommand, params)
+					result, err := getedgexparams.Put(controlcommand, params)
 					if err != nil {
-						return
+						common.Log.Errorf("sendcommand(proxyid string, params string, commandname string) case percent getedgexparams.Put failed: %v", err)
 					}
 					common.Log.Info("put result", string(result))
 				case "onoff":
 					if commandname == "onoff" {
-						commandid := device.Accessarysenders[j].Commands[k].ID
+						commandid := homebridgeconfig.Accessarysenders[j].Commands[k].ID
 						controlcommand := commandform(commandid, deviceid)
-						result, err := httpsender.Put(controlcommand, params)
+						result, err := getedgexparams.Put(controlcommand, params)
 						if err != nil {
-							return
+							common.Log.Errorf("sendcommand(proxyid string, params string, commandname string) case onoff getedgexparams.Put failed: %v", err)
 						}
 						common.Log.Info("put result", string(result))
 					}
@@ -211,8 +214,7 @@ func sendcommand(proxyid string, params string, commandname string) {
 	}
 }
 func commandform(commandid string, deviceid string) string {
-	controlstring := "http://localhost:48082/api/v1/device/"
-	controlcommand := controlstring + deviceid + "/command/" + commandid
+	controlcommand := CONTROLSTRING + deviceid + "/command/" + commandid
 	return controlcommand
 }
 func EventHanler(bd string) (err error) {
@@ -223,14 +225,13 @@ func EventHanler(bd string) (err error) {
 	bytestr := []byte(bd)
 	err = json.Unmarshal([]byte(bytestr), &event)
 	if err != nil {
-		common.Log.Error(err)
-		return err
+		common.Log.Errorf("EventHanler(bd string) bytestr json.Umarshal([]byte(bytestr), &event) failed: %v", err)
 	}
 	devicename := event.Device
-	for i := range device.Accessaries {
-		defaultname := device.Accessarysenders[i].Name
-		defaultid := device.Accessaries[i].ProxyID
-		defaulttype := device.Accessaries[i].Service
+	for i := range homebridgeconfig.Accessaries {
+		defaultname := homebridgeconfig.Accessarysenders[i].Name
+		defaultid := homebridgeconfig.Accessaries[i].ProxyID
+		defaulttype := homebridgeconfig.Accessaries[i].Service
 		if devicename == defaultname {
 			var dimmerablelightstatus DimmerableLightStatus
 			var curtainstatus CurtainStatus
@@ -238,7 +239,7 @@ func EventHanler(bd string) (err error) {
 			for j := range event.Readings {
 				switch event.Readings[j].Name {
 				case "brightness":
-					if device.Accessaries[i].Dimmerable == "true" {
+					if homebridgeconfig.Accessaries[i].Dimmerable == "true" {
 						dimmerablelightstatus.Characteristic.Brightness, _ = strconv.Atoi(event.Readings[j].Value)
 						if dimmerablelightstatus.Characteristic.Brightness > 0 {
 							dimmerablelightstatus.Characteristic.On = true
@@ -270,7 +271,7 @@ func EventHanler(bd string) (err error) {
 	}
 	data, err := json.MarshalIndent(status, "", " ")
 	if err != nil {
-		return err
+		common.Log.Errorf("EventHanler(bd string) data json.MarshalIndent failed: %v", err)
 	}
 	if string(data) != "{}" {
 		common.Log.Info("send to js ", string(data))

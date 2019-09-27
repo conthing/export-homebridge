@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	httpsender "github.com/conthing/export-homebridge/pkg/http"
-	zmqinit "github.com/conthing/export-homebridge/pkg/zmqinit"
+	"github.com/conthing/export-homebridge/getedgexparams"
+	zmqinit "github.com/conthing/export-homebridge/zmqreceivesendhandler"
 
 	"github.com/conthing/utils/common"
 	"github.com/gorilla/context"
@@ -56,21 +56,30 @@ type Status struct {
 	Characteristic map[string]interface{}
 }
 
+//初始化结构体Conifg，因不知道上方Config结构体里面的变量具体是什么，所以不用写。注:此句不可以改为cfg := Config{}因为若修改则需要放在函数内部，但由于多个函数在调用该变量所以不行
 var cfg = Config{}
 
+/*boot函数:1、因不知道edgex传入的params是什么，所以输入参数暂时不填写，输入参数的类型是interface{};2、判断export-homebridge有
+没有注册成功，没有则返回err并继续尝试；3、判断zmq有没有初始化成功，没有则返回err并继续尝试，有则返回nil并不再尝试*/
 func boot(_ interface{}) (needRetry bool, err error) {
-	err = httpsender.HttpPost(cfg.HTTP.Statusport)
+	err = getedgexparams.HttpPost(cfg.HTTP.Statusport)
 	if err != nil {
 		return true, err
+		common.Log.Errorf("boot(_ interface{}) getedgexparams.HttpPost(cfg.HTTP.Statusport) failed: %v", err)
 	}
 	err = zmqinit.InitZmq(cfg.HTTP.Statusport)
 	if err != nil {
 		return true, err
+		common.Log.Errorf("boot(_ interface{}) zmqinit.InitZmq(cfg.HTTP.Statusport) failed: %v", err)
 	}
 	return false, nil
 }
+
+/* main函数:1、配置文件起名并加载配置文件里面的内容；2、初始化日志；3、定义可以使main.go崩溃或export-homebridge没法编译和正常
+运行的3个错误的通道，分别是:listenForInterrupt(监听中断比如前台跑有没有按Ctrl+C)、startHTTPServer(监听HTTPServer有没有起来)、
+startZMQReceive(ZMQ的PUB和SUB正常不正常即能不能正常的接收数据)*/
 func main() {
-	start := time.Now()
+	start := time.Now() //记录下当前本地的时间
 	var cfgfile string
 	flag.StringVar(&cfgfile, "config", "configuration.toml", "Specify a profile other than default.") //如定义字符串就按定义的字符串来否则默认使用configuration.toml
 	flag.StringVar(&cfgfile, "c", "configuration.toml", "Specify a profile other than default.")      //两种方式 同上
@@ -78,7 +87,7 @@ func main() {
 	err := common.LoadConfig(cfgfile, &cfg)
 	common.InitLogger(&cfg.Log)
 	if err != nil {
-		common.Log.Errorf("failed to load config %v", err)
+		common.Log.Errorf("main() common.LoadConfig(cfgfile, &cfg) failed %v", err)
 		return
 	}
 	if common.Bootstrap(boot, nil, 60000, 2000) != nil {
