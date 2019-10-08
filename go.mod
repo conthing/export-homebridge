@@ -4,7 +4,8 @@ go 1.12
 
 require (
 	github.com/conthing/utils v0.0.0-20190910112134-d64cd157c8b8
-	github.com/edgexfoundry/go-mod-core-contracts v0.0.0-20190206111100-148998445693
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/edgexfoundry/go-mod-core-contracts v0.1.0
 	github.com/google/pprof v0.0.0-20190723021845-34ac40c74b70 // indirect
 	github.com/gorilla/context v1.1.1
 	github.com/gorilla/mux v1.7.1
