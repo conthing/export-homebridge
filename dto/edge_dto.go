@@ -1,13 +1,18 @@
 package dto
 
 // FlatCommand 原子化Command
-type EdgexCommand struct {
-	Name string    `json:"name"`
-	ID   string    `json:"id"`
-	Get  EdgexInfo `json:"get"`
+type EdgexCommandDevice struct {
+	Name     string         `json:"name"`
+	ID       string         `json:"id"`
+	Commands []EdgexCommand `json:"command'`
 }
 
-type EdgexInfo struct {
+type EdgexCommand struct {
+	Name string   `json:"name"`
+	GET  EdgexGET `json:"get"`
+}
+
+type EdgexGET struct {
 	URL string `json:"url"`
 }
 

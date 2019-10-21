@@ -469,12 +469,12 @@ func sendToHomebridge(status map[string]interface{}) {
 
 // FindSingleDeviceCommands 针对 、GETDEVICEBYNAMEURL 获取commands
 func FindSingleDeviceCommands(content []byte, id string) string {
-	var commands []dto.EdgexCommand
-	jsoniter.Get(content, "commands").ToVal(commands)
-	common.Log.Info(commands)
-	for _, command := range commands {
+	var device dto.EdgexCommandDevice
+	json.Unmarshal(content, device)
+	common.Log.Info(device)
+	for _, command := range device.Commands {
 		if command.Name == "mode" {
-			return command.Get.URL
+			return command.GET.URL
 		}
 	}
 	return ""
