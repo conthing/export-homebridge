@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/conthing/export-homebridge/getedgexparams"
@@ -317,7 +316,14 @@ func EventHanler(bd string) (err error) { //edgex将初始状态传递给onoff�
 	}
 	/* ------------ 转成homebridge的协议格式------------- */
 	for _, accessary := range homebridgeconfig.Accessaries {
-		if accessary.Name != event.Device {
+		// 根据 event.name 找到 id
+		content, err := FetchContent(GETDEVICEBYNAMEURL + event.Device)
+		if err != nil {
+			return err
+		}
+		id := jsoniter.Get(content, "id").ToString()
+		// 找到同一个id
+		if accessary.ProxyID != id {
 			continue
 		}
 		service := accessary.Service
@@ -388,6 +394,7 @@ func HVACService(accessary homebridgeconfig.Accessary, event Event) {
 	status := make(map[string]interface{})
 	reading := event.Readings[0]
 	name := event.Device
+
 	switch reading.Name {
 	case "onoff":
 		if reading.Value == "false" {
@@ -401,19 +408,22 @@ func HVACService(accessary homebridgeconfig.Accessary, event Event) {
 			}
 			id := jsoniter.Get(content, "id").ToString()
 			if id == "" {
-				str := GETDEVICEBYNAMEURL + name
-				common.Log.Error(str + "  id 为空")
+				common.Log.Error(" id 为空")
 				return
 			}
-			commands, err := FindSingleDeviceCommands(content, id)
+			url := FindSingleDeviceCommands(content, id)
+			if url == "" {
+				common.Log.Error("URL 为空")
+				return
+			}
+			data, err := FetchContent(url)
+			common.Log.Info(string(data))
 			if err != nil {
 				return
 			}
-			for _, command := range commands {
-				if command.Name == "mode" {
-					hvacstatus.Characteristic.Mode = EdgexToHomebridgeHvacModeMap[command.Value]
-				}
-			}
+			modeValue := jsoniter.Get(data, "readings", "0", "value").ToString()
+			hvacstatus.Characteristic.Mode = EdgexToHomebridgeHvacModeMap[modeValue]
+
 		}
 		hvacstatus.Id = accessary.ProxyID
 		hvacstatus.Name = accessary.Name
@@ -458,49 +468,16 @@ func sendToHomebridge(status map[string]interface{}) {
 }
 
 // FindSingleDeviceCommands 针对 、GETDEVICEBYNAMEURL 获取commands
-func FindSingleDeviceCommands(content []byte, id string) ([]dto.FlatCommand, error) {
-	jsonData := jsoniter.Get(content, "profile", "commands")
-	size := jsonData.Size()
-	var commands []dto.FlatCommand
-
-	list := make(chan dto.FlatCommand, size)
-	var waitGroup sync.WaitGroup
-	waitGroup.Add(size)
-
-	for i := 0; i < size; i++ {
-
-		commandName := jsoniter.Get(content, "profile", "commands", i, "name").ToString()
-		commandID := jsoniter.Get(content, "profile", "commands", i, "id").ToString()
-		go func(index int, commandName string, commandID string) {
-			conFetchStatus(id, commandName, commandID, list)
-			waitGroup.Done()
-		}(i, commandName, commandID)
+func FindSingleDeviceCommands(content []byte, id string) string {
+	var commands []dto.EdgexCommand
+	jsoniter.Get(content, "commands").ToVal(commands)
+	common.Log.Info(commands)
+	for _, command := range commands {
+		if command.Name == "mode" {
+			return command.Get.URL
+		}
 	}
-
-	waitGroup.Wait()
-	close(list)
-
-	for command := range list {
-		commands = append(commands, command)
-	}
-	return commands, nil
-}
-
-// 并发获取Status
-func conFetchStatus(id string, commandName string, commandID string, list chan dto.FlatCommand) {
-	content, err := FetchContent(CONTROLSTRING + id + "/command/" + commandID)
-
-	if err != nil {
-		common.Log.Error("获取 " + commandName + " 内容失败")
-		list <- dto.FlatCommand{Name: commandName}
-		return
-	}
-
-	value := jsoniter.Get(content, "readings", 0, "value").ToString()
-	device := jsoniter.Get(content, "readings", 0, "device").ToString()
-
-	command := dto.FlatCommand{commandName, commandID, value, device}
-	list <- command
+	return ""
 }
 
 // FetchContent （通常为第一步）拉取内容
