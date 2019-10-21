@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/conthing/admin-auth/auth"
 	"github.com/conthing/export-homebridge/getedgexparams"
 	"github.com/conthing/export-homebridge/homebridgeconfig"
 	"github.com/conthing/export-homebridge/zmqreceivesendhandler"
-
 	"github.com/conthing/utils/common"
 	"github.com/gorilla/mux"
 )
@@ -18,7 +18,7 @@ func LoadRestRoutes() http.Handler {
 	r.HandleFunc("/rest", commandHandler).Methods(http.MethodGet, http.MethodPost)
 	r.HandleFunc("/api/v1/version", versionHandler).Methods(http.MethodGet)
 	r.HandleFunc("/api/v1/reboot", rebootHandler).Methods(http.MethodPost)
-	r.HandleFunc("/api/v1/homebridge/qrcode", MiddleWare(qrcodeHandler)).Methods(http.MethodGet)
+	r.HandleFunc("/api/v1/homebridge/qrcode", auth.MiddleWare(qrcodeHandler)).Methods(http.MethodGet)
 	r.HandleFunc("/api/v1/ping", pingHandler).Methods(http.MethodGet)
 	return r
 }
