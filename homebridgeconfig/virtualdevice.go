@@ -1,14 +1,14 @@
 package homebridgeconfig
 
-type Project struct {
-	Id       string
-	Name     string
-	Commands []Command
+type VirtualDevice struct {
+	Id       string    `json:"id"`
+	Name     string    `json:"name"`
+	Commands []Command `json:"commands"`
 }
 
 type Command struct {
-	Id     string
-	Name   string
-	Value  string
-	Device string
+	Id     string `json:"id"`
+	Name   string `json:"name"`
+	Value  string `json:"value"`
+	Device string `json:"device"`
 }

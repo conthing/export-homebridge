@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/conthing/export-homebridge/errors"
 	"github.com/conthing/utils/common"
 )
 
@@ -41,6 +42,8 @@ type Accessary struct {
 	ProxyID    string `json:"proxy_id"`
 	Accessory  string `json:"accessory"`
 	Dimmerable string `json:"dimmerable,omitempty"`
+	Modes      string `json:"modes,omitempty"`
+	Fanlevels  string `json:"fanlevels,omitempty"`
 }
 
 //Envelope means the data transformed from coredata
@@ -66,18 +69,21 @@ type Accessarysender struct {
 	Commands []Commands
 }
 
+type Response struct {
+	Cached bool            `json:"cached"`
+	Data   []VirtualDevice `json:"data"`
+}
+
+var Pincode string
 var Accessaries []Accessary
 var Accessarysenders []Accessarysender
-var Pincode string
-var accessary Accessary             //定义accessary变量，类型为Accessary
-var accessarysender Accessarysender //定义accessarysender变量，类型为Accessarysender
 
-func changeNameUponConflict(oldname string) (name string) {
+func changeNameUponConflict(tempAccessaries []Accessary, oldname string) (name string) {
 	name = oldname
-	if Accessaries != nil {
+	if tempAccessaries != nil {
 		index := 1
-		for i := 0; i < len(Accessaries); i++ { //去遍历Accessaries里面有没有Name重复的
-			access := Accessaries[i]
+		for i := 0; i < len(tempAccessaries); i++ { //去遍历Accessaries里面有没有Name重复的
+			access := tempAccessaries[i]
 			if access.Name == name { //如果有重复
 				name = fmt.Sprintf("%s(%d)", oldname, index) //在后面加(1)
 				index++
@@ -92,23 +98,43 @@ func changeNameUponConflict(oldname string) (name string) {
 name相同时则对应的虚拟设备的alias就会相同，这个函数就保证了homekit上的虚拟设备的alias没有重名的，相同alias的会在其后加((1)、
 (2)、(3)....等等表示)，就是下方的的index := 1；2、homekit上的虚拟设备如果是调光灯在控制的时候就显示百分百，如果是开关灯在控制
 的时候就显示开和关；3、指定homebridge的config.json文件的生成路径；*/
-func GenerateHomebridgeConfig(lightdevice, curtaindevice []byte, statusport string) error {
-	var projects []Project
-	err := json.Unmarshal(lightdevice, &projects) //对light设备进行json非序列化动作，有err返回err
+func GenerateHomebridgeConfig(light, curtain, hvac []byte, statusport string) error {
+	var tempAccessaries []Accessary
+	var tempAccessarysenders []Accessarysender
+	var accessarysender Accessarysender //定义accessarysender变量，类型为Accessarysendervar
+
+	var lightResponse Response
+	var lightaccessary Accessary
+	err := json.Unmarshal(light, &lightResponse) //对light设备进行json非序列化动作，有err返回err
 	if err != nil {
-		common.Log.Errorf("GenerateHomebridgeConfig(lightdevice, curtaindevice []byte, statusport string) lightdevice json.Unmarshal(lightdevice, &projects) failed: %v", err)
+		common.Log.Errorf("GenerateHomebridgeConfig(lightdevice, curtaindevice, hvacdevice []byte, statusport string) lightdevice json.Unmarshal(lightdevice, &projects) failed: %v", err)
 	}
-	for _, project := range projects { //定义project遍历52030中的light列表
-		accessary.ProxyID = project.Id   //将虚拟设备的Id赋值给accessary.ProxyID，注Id是从edgex分配来的
-		accessary.Accessory = "Control4" //对accessary.Service、accessary.Accessory进行字符串赋值，以上这些都是config.json文件中的
-		accessary.Service = "Lightbulb"
+	if !lightResponse.Cached {
+		common.Log.Error("ha-project 初始化未完成")
+		return errors.ProjectUnfinishedErr
+	}
+	for _, virtualDevice := range lightResponse.Data { //定义project遍历52030中的light列表
+		lightaccessary.ProxyID = virtualDevice.Id //将虚拟设备的Id赋值给accessary.ProxyID，注Id是从edgex分配来的
+		lightaccessary.Accessory = "Control4"     //对accessary.Service、accessary.Accessory进行字符串赋值，以上这些都是config.json文件中的
+		lightaccessary.Service = "Lightbulb"
 		commands := accessarysender.Commands
+		valid := true
+		for _, projectcommand := range virtualDevice.Commands {
+			if projectcommand.Value == "" && projectcommand.Name == "alias" {
+				valid = false
+				break
+			}
+		}
+		if !valid {
+			common.Log.Info("过滤该虚拟设备")
+			continue
+		}
 		//这个for循环用在web上的zigbee设备的name如果相同则对应的虚拟设备灯光的alias也相同，这是在后面加上(1、2、3....)以示区分
-		for _, projectcommand := range project.Commands {
+		for _, projectcommand := range virtualDevice.Commands {
 			if projectcommand.Name == "alias" { //若projectcommand.Name等于alias则去遍历从52030获取的所有light的ailas，看是否有相同的
-				accessary.Name = changeNameUponConflict(projectcommand.Value)
+				lightaccessary.Name = changeNameUponConflict(tempAccessaries, projectcommand.Value)
 			} else if projectcommand.Name == "dimmerable" { //如果projectcommand.Name == "dimmerable"，则直接赋值accessary.Dimmerable = projectcommand.Value，
-				accessary.Dimmerable = projectcommand.Value // 注config.json中accessaries中只有proxy_id、name、dimmerable是需要从52030获取的，其它都是edgex分配的
+				lightaccessary.Dimmerable = projectcommand.Value // 注config.json中accessaries中只有proxy_id、name、dimmerable是需要从52030获取的，其它都是edgex分配的
 			}
 			var command Commands
 			command.ID = projectcommand.Id
@@ -116,24 +142,42 @@ func GenerateHomebridgeConfig(lightdevice, curtaindevice []byte, statusport stri
 			commands = append(commands, command)
 		}
 		accessarysender.Commands = commands
-		accessarysender.Name = project.Name
-		accessarysender.ID = project.Id
-		Accessaries = append(Accessaries, accessary)
-		Accessarysenders = append(Accessarysenders, accessarysender) //store deviceid and commandid
+		accessarysender.Name = virtualDevice.Name
+		accessarysender.ID = virtualDevice.Id
+		tempAccessaries = append(tempAccessaries, lightaccessary)
+		tempAccessarysenders = append(tempAccessarysenders, accessarysender) //store deviceid and commandid
 	}
-	projects = []Project{}
-	err = json.Unmarshal(curtaindevice, &projects)
+
+	common.Log.Info("lightAccessars: ", tempAccessaries) //store deviceid and commandid
+
+	var curtainResponse Response
+	var curtainaccessary Accessary
+	err = json.Unmarshal(curtain, &curtainResponse)
+	if !curtainResponse.Cached {
+		common.Log.Error("ha-project 初始化未完成")
+		return errors.ProjectUnfinishedErr
+	}
 	if err != nil {
-		common.Log.Errorf("GenerateHomebridgeConfig(lightdevice, curtaindevice []byte, statusport string) curtaindevice json.Unmarshal(curtaindevice, &projects) failed: %v", err)
+		common.Log.Errorf("GenerateHomebridgeConfig(lightdevice, curtaindevice, hvacdevice []byte, statusport string) curtaindevice json.Unmarshal(curtaindevice, &projects) failed: %v", err)
 	}
-	for _, project := range projects {
-		accessary.ProxyID = project.Id
-		accessary.Accessory = "Control4"
-		accessary.Service = "WindowCovering"
+	for _, project := range curtainResponse.Data {
+		curtainaccessary.ProxyID = project.Id
+		curtainaccessary.Accessory = "Control4"
+		curtainaccessary.Service = "WindowCovering"
 		commands := accessarysender.Commands
+		valid := true
+		for _, projectcommand := range project.Commands {
+			if projectcommand.Value == "" && projectcommand.Name == "alias" {
+				valid = false
+				break
+			}
+		}
+		if valid == false {
+			continue
+		}
 		for _, projectcommand := range project.Commands {
 			if projectcommand.Name == "alias" {
-				accessary.Name = changeNameUponConflict(projectcommand.Value)
+				curtainaccessary.Name = changeNameUponConflict(tempAccessaries, projectcommand.Value)
 			}
 			var command Commands
 			command.ID = projectcommand.Id
@@ -143,14 +187,63 @@ func GenerateHomebridgeConfig(lightdevice, curtaindevice []byte, statusport stri
 		accessarysender.Commands = commands
 		accessarysender.Name = project.Name
 		accessarysender.ID = project.Id
-		Accessaries = append(Accessaries, accessary)
-		Accessarysenders = append(Accessarysenders, accessarysender) //store deviceid and commandid
+		tempAccessaries = append(tempAccessaries, curtainaccessary)
+		tempAccessarysenders = append(tempAccessarysenders, accessarysender) //store deviceid and commandid
 	}
-	configdata, err := createConfigData(Accessaries, statusport)
+	common.Log.Info("curtainAccessars: ", tempAccessaries) //store deviceid and commandid
+
+	var hvacResponse Response
+	var hvacaccessary Accessary
+	err = json.Unmarshal(hvac, &hvacResponse)
+	if !hvacResponse.Cached {
+		common.Log.Error("ha-project 初始化未完成")
+		return errors.ProjectUnfinishedErr
+	}
+	if err != nil {
+		common.Log.Errorf("GenerateHomebridgeConfig(lightdevice, curtaindevice, hvacdevice []byte, statusport string) hvacdevice json.Unmarshal(hvacdevice, &projects) failed: %v", err)
+	}
+	for _, project := range hvacResponse.Data {
+		hvacaccessary.ProxyID = project.Id
+		hvacaccessary.Accessory = "Control4"
+		hvacaccessary.Service = "Thermostat"
+		commands := accessarysender.Commands
+		valid := true
+		for _, projectcommand := range project.Commands {
+			if projectcommand.Value == "" && projectcommand.Name == "alias" {
+				valid = false
+				break
+			}
+		}
+		if valid == false {
+			continue
+		}
+		for _, projectcommand := range project.Commands {
+			if projectcommand.Name == "alias" {
+				hvacaccessary.Name = changeNameUponConflict(tempAccessaries, projectcommand.Value)
+			} else if projectcommand.Name == "modes" {
+				hvacaccessary.Modes = projectcommand.Value
+			} else if projectcommand.Name == "fanlevels" {
+				hvacaccessary.Fanlevels = projectcommand.Value
+			}
+			var command Commands
+			command.ID = projectcommand.Id
+			command.Name = projectcommand.Name
+			commands = append(commands, command)
+		}
+		accessarysender.Commands = commands
+		accessarysender.Name = project.Name
+		accessarysender.ID = project.Id
+		tempAccessaries = append(tempAccessaries, hvacaccessary)
+		tempAccessarysenders = append(tempAccessarysenders, accessarysender)
+		common.Log.Info("hvacAccessars: ", tempAccessaries) //store deviceid and commandid
+	}
+
+	configdata, err := createConfigData(tempAccessaries, statusport)
 	if err != nil {
 		common.Log.Errorf("createConfigData failed: %v", err)
 	}
 	b, err := json.MarshalIndent(configdata, "", " ")
+	common.Log.Info(b)
 	if err != nil {
 		common.Log.Errorf("b, err := json.MarshalIndent(configdata) failed: %v", err)
 	}
@@ -159,6 +252,8 @@ func GenerateHomebridgeConfig(lightdevice, curtaindevice []byte, statusport stri
 	if err != nil {
 		common.Log.Errorf("ioutil.WriteFile(/root/.homebridge/config.json, b, os.ModePerm) failed: %v", err)
 	}
+	Accessaries = tempAccessaries
+	Accessarysenders = tempAccessarysenders
 	return nil
 }
 

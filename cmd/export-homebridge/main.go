@@ -8,6 +8,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/conthing/export-homebridge/getedgexparams"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,12 +16,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/conthing/export-homebridge/getedgexparams"
 	zmqinit "github.com/conthing/export-homebridge/zmqreceivesendhandler"
 
 	"github.com/conthing/utils/common"
 	"github.com/gorilla/context"
-	serial "github.com/tarm/goserial"
+	"github.com/tarm/goserial"
 )
 
 //Config is the data from config
@@ -43,11 +43,6 @@ type CommandConfig struct {
 	Data []int
 }
 
-//CommandData is the data from config
-type CommandData struct {
-	Data []byte
-}
-
 //Status is the data which is ready to send to js
 type Status struct {
 	ID             string `json:"id"`
@@ -64,13 +59,13 @@ var cfg = Config{}
 func boot(_ interface{}) (needRetry bool, err error) {
 	err = getedgexparams.HttpPost(cfg.HTTP.Statusport)
 	if err != nil {
-		return true, err
 		common.Log.Errorf("boot(_ interface{}) getedgexparams.HttpPost(cfg.HTTP.Statusport) failed: %v", err)
+		return true, err
 	}
 	err = zmqinit.InitZmq(cfg.HTTP.Statusport)
 	if err != nil {
-		return true, err
 		common.Log.Errorf("boot(_ interface{}) zmqinit.InitZmq(cfg.HTTP.Statusport) failed: %v", err)
+		return true, err
 	}
 	return false, nil
 }

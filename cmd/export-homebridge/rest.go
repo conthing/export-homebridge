@@ -52,11 +52,13 @@ func qrcodeHandler(w http.ResponseWriter, r *http.Request) {
 // Respond with PINGRESPONSE to see if the service is alive
 func pingHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("pong"))
+	_, err := w.Write([]byte("pong"))
+	if err != nil {
+		common.Log.Error(err)
+	}
 }
 
-func commandHandler(w http.ResponseWriter, r *http.Request) {
-
+func commandHandler(w http.ResponseWriter, r *http.Request) { //edgex传递参数
 	defer func() {
 		err := r.Body.Close()
 		if err != nil {
@@ -67,6 +69,7 @@ func commandHandler(w http.ResponseWriter, r *http.Request) {
 	n, _ := r.Body.Read(buf)  // 为这次读出的数据大小
 	var bd string
 	bd = string(buf[:n])
+	//common.Log.Info("commandHandler ", bd)
 	err := zmqreceivesendhandler.EventHanler(bd)
 	if err != nil {
 		common.Log.Errorf("commandHandler(w http.ResponseWriter, r *http.Request) zmqreceivesendhandler.EventHanler(bd) failed: %v", err)
@@ -102,5 +105,6 @@ func rebootHandler(w http.ResponseWriter, r *http.Request) {
 	homebridgeconfig.Accessarysenders = nil
 	var lightdevicelist, _ = getedgexparams.GetMessage(getedgexparams.LIGHTPROJECTURL)
 	var curtaindevicelist, _ = getedgexparams.GetMessage(getedgexparams.CURTAINPROJECTURL)
-	_ = homebridgeconfig.GenerateHomebridgeConfig(lightdevicelist, curtaindevicelist, zmqreceivesendhandler.Statuspubport)
+	var hvacdevicelist, _ = getedgexparams.GetMessage(getedgexparams.HVACPROJECTURL)
+	_ = homebridgeconfig.GenerateHomebridgeConfig(lightdevicelist, curtaindevicelist, hvacdevicelist, zmqreceivesendhandler.Statuspubport)
 }

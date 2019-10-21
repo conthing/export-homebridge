@@ -3,9 +3,11 @@ package getedgexparams
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/conthing/export-homebridge/errors"
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/conthing/export-homebridge/homebridgeconfig"
 	"github.com/conthing/utils/common"
@@ -15,7 +17,9 @@ import (
 const (
 	LIGHTPROJECTURL   = "http://localhost:52030/api/v1/project/Light"
 	CURTAINPROJECTURL = "http://localhost:52030/api/v1/project/Curtain"
+	HVACPROJECTURL    = "http://localhost:52030/api/v1/project/HVAC" //加的空调的常量hvacprojecturl
 	REGISTRATIONURL   = "http://localhost:48071/api/v1/registration"
+	URL               = "http://localhost:48082/api/v1/device/"
 )
 
 //第一步:向edgex48071中注册(写)export-homebridge(http://localhost:48071/api/v1/registration)
@@ -23,8 +27,8 @@ func HttpPost(statusport string) error {
 	reg := models.Registration{}
 	reg.Name = "RESTXMLClient"
 	reg.Format = "JSON"
-	//起筛选作用，目前灯光、窗帘等虚拟设备只有亮度值、开关状态、行程值、行程状态等4个变量
-	reg.Filter.ValueDescriptorIDs = []string{"brightness", "percent", "moving", "onoff"}
+	//起筛选作用，目前灯光、窗帘等虚拟设备只有亮度值、开关状态、行程值、行程状态等4个变量,空调有模式选择、风速选择、温度设置等值，空调的开关和灯光的开关共用一个onoff
+	reg.Filter.ValueDescriptorIDs = []string{}
 	reg.Enable = true
 	reg.Destination = "REST_ENDPOINT"
 	reg.Addressable = models.Addressable{Name: "EdgeXTestRESTXML", Protocol: "HTTP", HTTPMethod: "POST",
@@ -51,26 +55,42 @@ func HttpPost(statusport string) error {
 	common.Log.Info(string(body)) //打印注册的数据
 
 	// 第二步:获取设备列表
-	lightdevicelist, err := GetMessage(LIGHTPROJECTURL)
+	light, curtain, hvac := getAllList()
+	err = homebridgeconfig.GenerateHomebridgeConfig(light, curtain, hvac, statusport)
+	for err == errors.ProjectUnfinishedErr {
+		time.Sleep(time.Second * 2)
+		light, curtain, hvac := getAllList()
+		err = homebridgeconfig.GenerateHomebridgeConfig(light, curtain, hvac, statusport)
+
+	}
+	if err != nil {
+		common.Log.Errorf("homebridgeconfig.GenerateHomebridgeConfig(lightdevicelist, curtaindevicelist, hvacdevicelist, statusport) failed: %v", err)
+	}
+	return nil
+}
+
+func getAllList() (light, curtain, hvac []byte) {
+	light, err := GetMessage(LIGHTPROJECTURL)
 	if err != nil {
 		common.Log.Errorf("GetMessage(LIGHTPROJECTURL) failed: %v", err)
 	}
-	curtaindevicelist, err := GetMessage(CURTAINPROJECTURL)
+	curtain, err = GetMessage(CURTAINPROJECTURL)
 	if err != nil {
 		common.Log.Errorf("GetMessage(CURTAINPROJECTURL) failed: %v", err)
 	}
-	err = homebridgeconfig.GenerateHomebridgeConfig(lightdevicelist, curtaindevicelist, statusport)
+	hvac, err = GetMessage(HVACPROJECTURL) //获取空调设备列表
 	if err != nil {
-		common.Log.Errorf("homebridgeconfig.GenerateHomebridgeConfig(lightdevicelist, curtaindevicelist, statusport) failed: %v", err)
+		common.Log.Errorf("GetMessage(HVACPROJECTURL) failed: %v", err)
 	}
-	return nil
+	return
 }
 
 func GetMessage(url string) (body []byte, err error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, err
 		common.Log.Errorf(" GetMessage(url string) http.Get(url) failed: %v", err)
+
+		return nil, err
 	}
 	defer func() {
 		err = resp.Body.Close()
@@ -86,12 +106,11 @@ func GetMessage(url string) (body []byte, err error) {
 	return
 }
 
-////todo commandstring应该命名成url  ?????? commanfstring是输入参数 是什么  为什么要命名为url
-func Put(commandstring string, params string) (status string, err error) {
-	common.Log.Info("commandstring :", commandstring)
+func Put(URL string, params string) (status string, err error) {
+	common.Log.Info("commandstring :", URL)
 	common.Log.Info("params :", params)
 	payload := strings.NewReader(params)
-	req, err := http.NewRequest("PUT", commandstring, payload)
+	req, err := http.NewRequest("PUT", URL, payload)
 	if err != nil {
 		common.Log.Errorf("Put(commandstring string, params string) http.NewRequest(PUT, commandstring, payload) failed: %v", err)
 		return "", err
