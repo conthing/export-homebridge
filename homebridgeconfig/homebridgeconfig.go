@@ -38,15 +38,15 @@ type Platform struct {
 //omitempty的注释:1、加上omitempty如果dimmerable为nil，则生成的dimmerable不会显示""；2、不加omitempty则如果dimmerable为nil，生成的dimmerable会显示""；
 type Accessary struct {
 	Service    string `json:"service"`
-	Name       string `json:"name"`
-	ProxyID    string `json:"proxy_id"`
+	Name       string `json:"name"`     //这个Name是alias
+	ProxyID    string `json:"proxy_id"` //ProxyID是deviceID
 	Accessory  string `json:"accessory"`
 	Dimmerable string `json:"dimmerable,omitempty"`
 	Modes      string `json:"modes,omitempty"`
-	Fanlevels  string `json:"fanlevels,omitempty"`
+	//Fanlevels  string `json:"fanlevels,omitempty"`
 }
 
-//Envelope means the data transformed from coredata
+//Envelope means the data transformed from coremetadata
 type Envelope []struct {
 	Name    string
 	ID      string
@@ -54,21 +54,17 @@ type Envelope []struct {
 }
 type Profile struct {
 	Name     string
-	Commands []Commands
+	Commands []Command
 }
 
-//Command means control
-type Commands struct {
-	ID   string
-	Name string
-}
 type Accessarysender struct {
 	Service  string
-	Name     string
-	ID       string
-	Commands []Commands
+	Name     string //注:Name是指真实的name
+	ID       string //注:ID是指deviceid
+	Commands []Command
 }
 
+//ha-project新加的
 type Response struct {
 	Cached bool            `json:"cached"`
 	Data   []VirtualDevice `json:"data"`
@@ -101,7 +97,7 @@ name相同时则对应的虚拟设备的alias就会相同，这个函数就保�
 func GenerateHomebridgeConfig(light, curtain, hvac []byte, statusport string) error {
 	var tempAccessaries []Accessary
 	var tempAccessarysenders []Accessarysender
-	var accessarysender Accessarysender //定义accessarysender变量，类型为Accessarysendervar
+	var accessarysender Accessarysender
 
 	var lightResponse Response
 	var lightaccessary Accessary
@@ -117,18 +113,7 @@ func GenerateHomebridgeConfig(light, curtain, hvac []byte, statusport string) er
 		lightaccessary.ProxyID = virtualDevice.Id //将虚拟设备的Id赋值给accessary.ProxyID，注Id是从edgex分配来的
 		lightaccessary.Accessory = "Control4"     //对accessary.Service、accessary.Accessory进行字符串赋值，以上这些都是config.json文件中的
 		lightaccessary.Service = "Lightbulb"
-		commands := accessarysender.Commands
-		valid := true
-		for _, projectcommand := range virtualDevice.Commands {
-			if projectcommand.Value == "" && projectcommand.Name == "alias" {
-				valid = false
-				break
-			}
-		}
-		if !valid {
-			common.Log.Info("过滤该虚拟设备")
-			continue
-		}
+		commands := []Command{}
 		//这个for循环用在web上的zigbee设备的name如果相同则对应的虚拟设备灯光的alias也相同，这是在后面加上(1、2、3....)以示区分
 		for _, projectcommand := range virtualDevice.Commands {
 			if projectcommand.Name == "alias" { //若projectcommand.Name等于alias则去遍历从52030获取的所有light的ailas，看是否有相同的
@@ -136,19 +121,21 @@ func GenerateHomebridgeConfig(light, curtain, hvac []byte, statusport string) er
 			} else if projectcommand.Name == "dimmerable" { //如果projectcommand.Name == "dimmerable"，则直接赋值accessary.Dimmerable = projectcommand.Value，
 				lightaccessary.Dimmerable = projectcommand.Value // 注config.json中accessaries中只有proxy_id、name、dimmerable是需要从52030获取的，其它都是edgex分配的
 			}
-			var command Commands
-			command.ID = projectcommand.Id
+			var command Command
+			command.ID = projectcommand.ID
 			command.Name = projectcommand.Name
+			command.Value = projectcommand.Value
 			commands = append(commands, command)
 		}
 		accessarysender.Commands = commands
 		accessarysender.Name = virtualDevice.Name
 		accessarysender.ID = virtualDevice.Id
+		accessarysender.Service = "Lightbulb"
 		tempAccessaries = append(tempAccessaries, lightaccessary)
 		tempAccessarysenders = append(tempAccessarysenders, accessarysender) //store deviceid and commandid
 	}
-
-	common.Log.Info("lightAccessars: ", tempAccessaries) //store deviceid and commandid
+	common.Log.Info("lightAccessars: ", tempAccessaries)
+	common.Log.Info("light: ", accessarysender)
 
 	var curtainResponse Response
 	var curtainaccessary Accessary
@@ -164,33 +151,28 @@ func GenerateHomebridgeConfig(light, curtain, hvac []byte, statusport string) er
 		curtainaccessary.ProxyID = project.Id
 		curtainaccessary.Accessory = "Control4"
 		curtainaccessary.Service = "WindowCovering"
-		commands := accessarysender.Commands
-		valid := true
-		for _, projectcommand := range project.Commands {
-			if projectcommand.Value == "" && projectcommand.Name == "alias" {
-				valid = false
-				break
-			}
-		}
-		if valid == false {
-			continue
-		}
+		commands := []Command{}
+
 		for _, projectcommand := range project.Commands {
 			if projectcommand.Name == "alias" {
 				curtainaccessary.Name = changeNameUponConflict(tempAccessaries, projectcommand.Value)
 			}
-			var command Commands
-			command.ID = projectcommand.Id
+			var command Command
+			command.ID = projectcommand.ID
 			command.Name = projectcommand.Name
+			command.Value = projectcommand.Value
+
 			commands = append(commands, command)
 		}
 		accessarysender.Commands = commands
 		accessarysender.Name = project.Name
 		accessarysender.ID = project.Id
+		accessarysender.Service = "WindowCovering"
 		tempAccessaries = append(tempAccessaries, curtainaccessary)
 		tempAccessarysenders = append(tempAccessarysenders, accessarysender) //store deviceid and commandid
 	}
-	common.Log.Info("curtainAccessars: ", tempAccessaries) //store deviceid and commandid
+	common.Log.Info("curtainAccessars: ", tempAccessaries)
+	common.Log.Info("curtain: ", accessarysender)
 
 	var hvacResponse Response
 	var hvacaccessary Accessary
@@ -206,37 +188,31 @@ func GenerateHomebridgeConfig(light, curtain, hvac []byte, statusport string) er
 		hvacaccessary.ProxyID = project.Id
 		hvacaccessary.Accessory = "Control4"
 		hvacaccessary.Service = "Thermostat"
-		commands := accessarysender.Commands
-		valid := true
-		for _, projectcommand := range project.Commands {
-			if projectcommand.Value == "" && projectcommand.Name == "alias" {
-				valid = false
-				break
-			}
-		}
-		if valid == false {
-			continue
-		}
+		commands := []Command{}
+
 		for _, projectcommand := range project.Commands {
 			if projectcommand.Name == "alias" {
 				hvacaccessary.Name = changeNameUponConflict(tempAccessaries, projectcommand.Value)
 			} else if projectcommand.Name == "modes" {
 				hvacaccessary.Modes = projectcommand.Value
-			} else if projectcommand.Name == "fanlevels" {
-				hvacaccessary.Fanlevels = projectcommand.Value
-			}
-			var command Commands
-			command.ID = projectcommand.Id
+			} //else if projectcommand.Name == "fanlevels" {
+			//hvacaccessary.Fanlevels = projectcommand.Value
+			//}
+			var command Command
+			command.ID = projectcommand.ID
 			command.Name = projectcommand.Name
+			command.Value = projectcommand.Value
 			commands = append(commands, command)
 		}
 		accessarysender.Commands = commands
 		accessarysender.Name = project.Name
 		accessarysender.ID = project.Id
+		accessarysender.Service = "Thermostat"
 		tempAccessaries = append(tempAccessaries, hvacaccessary)
-		tempAccessarysenders = append(tempAccessarysenders, accessarysender)
-		common.Log.Info("hvacAccessars: ", tempAccessaries) //store deviceid and commandid
+		tempAccessarysenders = append(tempAccessarysenders, accessarysender) //store deviceid and commandid
 	}
+	common.Log.Info("hvacAccessars: ", tempAccessaries)
+	common.Log.Info("hvac: ", accessarysender)
 
 	configdata, err := createConfigData(tempAccessaries, statusport)
 	if err != nil {

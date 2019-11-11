@@ -3,7 +3,6 @@ package getedgexparams
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/conthing/export-homebridge/errors"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -20,6 +19,7 @@ const (
 	HVACPROJECTURL    = "http://localhost:52030/api/v1/project/HVAC" //加的空调的常量hvacprojecturl
 	REGISTRATIONURL   = "http://localhost:48071/api/v1/registration"
 	URL               = "http://localhost:48082/api/v1/device/"
+	HAPROJECTPING     = "http://localhost:52030/api/v1/ping"
 )
 
 //第一步:向edgex48071中注册(写)export-homebridge(http://localhost:48071/api/v1/registration)
@@ -55,14 +55,21 @@ func HttpPost(statusport string) error {
 	common.Log.Info(string(body)) //打印注册的数据
 
 	// 第二步:获取设备列表
+	_, err = GetMessage(HAPROJECTPING)
+	for err != nil {
+		time.Sleep(time.Second * 5)
+		_, err = GetMessage(HAPROJECTPING)
+	}
+	//light, curtain, hvac := getAllList()
+	//err = homebridgeconfig.GenerateHomebridgeConfig(light, curtain, hvac, statusport)
+	//for err == errors.ProjectUnfinishedErr {
+	//	time.Sleep(time.Second * 2)
+	//	light, curtain, hvac := getAllList()
+	//	err = homebridgeconfig.GenerateHomebridgeConfig(light, curtain, hvac, statusport)
+	//
+	//}
 	light, curtain, hvac := getAllList()
 	err = homebridgeconfig.GenerateHomebridgeConfig(light, curtain, hvac, statusport)
-	for err == errors.ProjectUnfinishedErr {
-		time.Sleep(time.Second * 2)
-		light, curtain, hvac := getAllList()
-		err = homebridgeconfig.GenerateHomebridgeConfig(light, curtain, hvac, statusport)
-
-	}
 	if err != nil {
 		common.Log.Errorf("homebridgeconfig.GenerateHomebridgeConfig(lightdevicelist, curtaindevicelist, hvacdevicelist, statusport) failed: %v", err)
 	}
@@ -116,7 +123,7 @@ func Put(URL string, params string) (status string, err error) {
 		return "", err
 	}
 	req.Header.Add("Content-Type", "application/json")
-	////todo 这个author是什么，加注释
+	////todo 这个Authorization是什么，加注释
 	req.Header.Add("Authorization", "bmgAAGI155F6MJ3N2Tk9ruL_6XQpx-uxkkg:yKx_OYDtI3njD7-c7Y87Oov0GpI=:eyJyZXNvdXJBvcy93aF9mbG93RGF0YVNvdXJjZTEiLCJleHBpcmVzIjoxNTM2NzU1MjkwLCJjb250ZW50TUQ1IjoiIiwiY29udGVudFR5cGUiOiJhcHBsaWNhdGlvbi9qc29uIiwiaGVhZGVycyI6IiIsIm1ldGhvZCI6IlBVVCJ9")
 	////todo 为什么是这个特定的时间，加注释
 	req.Header.Add("Date", "Wed, 12 Sep 2018 02:10:09 GMT")
