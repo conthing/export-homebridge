@@ -1,0 +1,15 @@
+#%RAML 1.0
+title: Homebridge Export Service
+version: v1
+baseUri: http://localhost:52032/api/{version}
+/bridges: 
+    displayName: Ping Resource
+    description: Example - http://localhost:52032/api/v1/status
+    get: 
+        description: 获取homebridge列表
+        responses: 
+            "200": 
+                description: 返回homebrige列表
+                body: 
+                    application/json: 
+                        example: '[{"pin":"11-22-33","qrcode":"HM://124324fdas"}]'
